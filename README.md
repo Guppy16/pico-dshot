@@ -33,6 +33,14 @@ NOTE: need a good source for this.
 ---
 ## Scheme
 
+- Main aim: setup a pid loop / kalman filter to perform a linear ramp?
+- Interestingly, since the number of dshot values is discretised, 
+it might be possible to create a table characterising the response 
+from one throttle value to another!?
+
+- Move ramp_motor / arm_motor to utils with a state machine
+- create a flag in main.cpp to check if a character should be repeated
+
 The ESC needs commands to be sent within a set interval (currently undetermined). In order to satisfy this, the code is modelled as follows:
 
 NOTE: Timer interrupt should be longer than the time taken to send a command from the buffer using DMA. This is so that there is enough time for the Main loop to send the next command before the interrupt is raised!
