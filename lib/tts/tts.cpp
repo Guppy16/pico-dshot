@@ -45,76 +45,38 @@ alarm_pool_t *tts::pico_alarm_pool = alarm_pool_create(DMA_ALARM_NUM, PICO_TIME_
 
 // Debugging
 
-void tts::print_gpio_setup()
-{
-    Serial.println("\nGPIO Setup");
+void tts::print_gpio_setup() {
+  printf("\nGPIO Setupi\n");
 
-    Serial.print("LED_BUILTIN: GPIO ");
-    Serial.println(LED_BUILTIN);
-
-    Serial.print("MOTOR: GPIO ");
-    Serial.println(MOTOR_GPIO);
+  printf("LED_BUILTIN: GPIO %i", LED_BUILTIN);
+  printf("MOTOR: GPIO %i", MOTOR_GPIO);
 }
 
-void tts::print_dshot_setup()
-{
-    Serial.println("\nDShot Setup");
+void tts::print_dshot_setup() {
+  printf("\nDShot Setup");
 
-    Serial.print("Wrap: ");
-    Serial.print(DSHOT_PWM_WRAP);
-
-    Serial.print("\tLow: ");
-    Serial.print(DSHOT_LOW);
-
-    Serial.print("\tHigh: ");
-    Serial.print(DSHOT_HIGH);
-
-    Serial.println();
+  printf("Wrap: %i", DSHOT_PWM_WRAP);
+  printf("\tLow: %i", DSHOT_LOW);
+  printf("\tHigh: %i", DSHOT_HIGH);
 }
 
-void tts::print_pwm_setup()
-{
-    Serial.println("\nPWM Setup");
+void tts::print_pwm_setup() {
+  printf("\nPWM Setup\n");
 
-    Serial.print("Slice Num: ");
-    Serial.println(tts::pwm_slice_num);
-
-    Serial.print("Channel: ");
-    Serial.println(tts::pwm_channel);
+  printf("Slice Num: %i", tts::pwm_slice_num);
+  printf("Channel: %i", tts::pwm_channel);
 }
 
-void tts::print_dma_setup()
-{
-    Serial.println("\nDMA Setup");
+void tts::print_dma_setup() {
+  printf("\nDMA Setup\n");
 
-    Serial.print("Channel: ");
-    Serial.println(tts::dma_channel);
+  printf("Channel: %i", tts::dma_channel);
+  printf("Buffer Length: %i", DSHOT_FRAME_LENGTH);
 
-    Serial.print("Buffer Length: ");
-    Serial.println(DSHOT_FRAME_LENGTH);
+  // printf("Repeating Timer Setup: ");
+  // printf("Not implemented");
+  // printf(tts::dma_alarm_rt_state);
 
-    Serial.print("Repeating Timer Setup: ");
-    Serial.println("Not implemented");
-    // Serial.print(tts::dma_alarm_rt_state);
-
-    Serial.print("Alarm Period (us): ");
-    Serial.println(DMA_ALARM_PERIOD);
+  printf("Alarm Period (us): %i", DMA_ALARM_PERIOD);
 }
-
-// Depracated
-
-void tts::_print_pwm_setup(const pwm_config &conf)
-{
-    Serial.println("\nPWM config");
-
-    Serial.print("csr: ");
-    Serial.print(conf.csr);
-
-    Serial.print("\tdiv: ");
-    Serial.print(conf.div);
-
-    Serial.print("\ttop: ");
-    Serial.print(conf.top);
-
-    Serial.println();
-}
+>>>>>>> 4332d2d (refactor: replace all Arduino methods with standard methods)
