@@ -75,3 +75,4 @@ constexpr uint16_t MAX_THROTTLE = 2047;  // 2^12 - 1
 constexpr uint16_t ARM_THROTTLE = 300;   // < 50% MAX_THROTTLE
 
 constexpr uint LED_BUILTIN = 25;
+constexpr uint8_t THROTTLE_INCREMENT = 50;
