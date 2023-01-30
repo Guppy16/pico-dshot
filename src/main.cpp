@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "pico/platform.h"
 #include "pico/stdlib.h"
 #include "shoot.h"
 #include "utils.h"
