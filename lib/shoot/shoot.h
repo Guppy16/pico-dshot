@@ -7,8 +7,6 @@
 #pragma once
 #include "tts.h"
 
-#include "pico/time.h"
-#include "hardware/timer.h"
 #include "hardware/irq.h"
 
 namespace shoot
@@ -40,16 +38,13 @@ namespace shoot
      */
     void send_dshot_frame(bool debug = false);
 
-    // Repeating timer setup
+    // --- Repeating timer setup
 
     // Keep track of repeating timer status
     extern bool dma_alarm_rt_state;
 
     // Setup a repeating timer configuration
     extern struct repeating_timer send_frame_rt;
-
-    // Create alarm pool
-    extern alarm_pool_t *pico_alarm_pool;
 
     // Routine to setup repeating timer to send dshot frame
     void rt_setup();

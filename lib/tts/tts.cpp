@@ -38,6 +38,11 @@ void tts::dma_setup()
     channel_config_set_dreq(&tts::dma_config, DREQ_PWM_WRAP0 + tts::pwm_slice_num);
 }
 
+// Alarm pool
+
+alarm_pool_t *tts::pico_alarm_pool = alarm_pool_create(DMA_ALARM_NUM, PICO_TIME_DEFAULT_ALARM_POOL_MAX_TIMERS);
+
+
 // Debugging
 
 void tts::print_gpio_setup()

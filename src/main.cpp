@@ -1,37 +1,7 @@
 #include <Arduino.h>
-#include "pico/time.h"
 
-// #include "hardware/dma.h"
-#include "hardware/timer.h"
-#include "hardware/irq.h"
-
-// #include "tts.h"
-// #include "dshot.h"
 #include "shoot.h"
 #include "utils.h"
-
-// TODO: Change default behviour to: bool debug = false
-// void send_dshot_frame(bool = true);
-
-// DMA Alarm config
-// ISR to send DShot frame over DMA
-bool repeating_send_dshot_frame(struct repeating_timer *rt)
-{
-    // Send DShot frame
-    shoot::send_dshot_frame(false);
-    // CAN DO: Use rt-> for debug
-    // Return true so that timer repeats
-    return true;
-}
-
-// Keep track of repeating timer status
-bool dma_alarm_rt_state = false;
-// Setup a repeating timer configuration
-struct repeating_timer send_frame_rt;
-// Create alarm pool
-alarm_pool_t *pico_alarm_pool = alarm_pool_create(DMA_ALARM_NUM, PICO_TIME_DEFAULT_ALARM_POOL_MAX_TIMERS);
-// uint16_t throttle_code = 0;
-// uint16_t telemtry = 0;
 
 void setup()
 {
@@ -49,7 +19,9 @@ void setup()
     tts::dma_setup();
 
     // Set repeating timer
-    dma_alarm_rt_state = alarm_pool_add_repeating_timer_us(pico_alarm_pool, DMA_ALARM_PERIOD, repeating_send_dshot_frame, NULL, &send_frame_rt);
+    // NOTE: this can be put in main loop to start 
+    // repeating timer on key press (e.g. a for arm)
+    shoot::rt_setup();
 
     delay(1500);
 
@@ -57,9 +29,6 @@ void setup()
     tts::print_dshot_setup();
     tts::print_pwm_setup();
     tts::print_dma_setup();
-
-    Serial.print("\nDMA Repeating Timer Setup: ");
-    Serial.print(dma_alarm_rt_state);
 
     Serial.print("Initial throttle: ");
     Serial.print(shoot::throttle_code);
@@ -178,7 +147,7 @@ void loop()
             shoot::telemetry = 0;
         }
 
-        // NOTE: In Debug mode, sending a DSHOT Frame takes a lot of time!
+        // NOTE: In DEBUG mode, sending a DSHOT Frame takes a lot of time!
         // So it may seem as if the PICO is unable to detect key presses
         // while sending commands!
         // But is this even needed?

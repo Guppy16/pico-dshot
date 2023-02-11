@@ -1,18 +1,22 @@
 #pragma once
 #include <Arduino.h>
+
+#include "pico/time.h"
 #include "hardware/pwm.h"
 #include "hardware/dma.h"
+
 #include "config.h"
 
 namespace tts
 {
     // PWM config
 
-    /*! \brief The slice number is the upper or lower half of 32 bits
-     *  \ingroup PWM
+    /*! \brief The slice number is the upper or lower half of 32 bits.
      *
-     * Timers are 16 bits, but are inefficint to store these in 32 bit systems
+     * Timers are 16 bits, but are inefficint to store in 32 bit systems,
      * hence timers are stored in either the lower or upper "slice" of 32 bits
+     *
+     * \ingroup PWM
      * NOTE: const is extern by default
      */
     const uint pwm_slice_num = pwm_gpio_to_slice_num(MOTOR_GPIO);
@@ -38,6 +42,9 @@ namespace tts
     void print_dshot_setup();
     void print_pwm_setup();
     void print_dma_setup();
+
+    // Create alarm pool
+    extern alarm_pool_t *pico_alarm_pool;
 
     // Depracated
 
