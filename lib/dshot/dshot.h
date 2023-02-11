@@ -6,6 +6,8 @@
 */
 namespace DShot
 {
+    uint16_t dshot_code_telemtry_to_command(const uint16_t code, const uint16_t t);
+
     uint16_t command_to_crc(const uint16_t &cmd);
 
     uint16_t command_to_packet(const uint16_t &cmd);

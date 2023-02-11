@@ -1,5 +1,10 @@
 #include "dshot.h"
 
+uint16_t DShot::dshot_code_telemtry_to_command(const uint16_t code, const uint16_t t)
+{
+  return code << 1 | t;
+}
+
 /*
 Assumes tha cmd is a 12 bit number
 (i.e. 11 bit DShot code + telemtry: CCCC CCCC CCCT)
@@ -25,8 +30,9 @@ void DShot::packet_to_pwm(const uint16_t &packet, uint32_t pwm_buffer[], const u
 {
   uint32_t pwm_val = 0;
   unsigned int packet_size = 16;
-  for (uint32_t b = packet_size - 1; b < packet_size; --b){
-    pwm_val = (uint32_t) (((packet >> b) & 1) ? DShot_high : DShot_low);
-    pwm_buffer[packet_size - b - 1] = pwm_val << (16 * channel);
+  for (uint32_t b = 0; b < packet_size; ++b)
+  {
+    pwm_val = (uint32_t)(((packet << b) & 0x8000) ? DShot_high : DShot_low);
+    pwm_buffer[b] = pwm_val << (16 * channel);
   }
 }
