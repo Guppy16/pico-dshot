@@ -20,19 +20,19 @@
 // Note that these should be cast uint32_t when sent to the slice
 
 // WRAP = Total number of counts in PWM cycle
-constexpr uint16_t DMA_WRAP = DEBUG ? (1 << 16) - 1 : 1000 * MCU_FREQ / DSHOT_SPEED;
+constexpr uint16_t DSHOT_PWM_WRAP = DEBUG ? (1 << 16) - 1 : 1000 * MCU_FREQ / DSHOT_SPEED;
 
 // Number of counts to represent a digital low
-constexpr uint16_t DSHOT_LOW = 0.37 * DMA_WRAP;
+constexpr uint16_t DSHOT_LOW = 0.37 * DSHOT_PWM_WRAP;
 
 // Number of counts to represent a digital high
-constexpr uint16_t DSHOT_HIGH = 0.75 * DMA_WRAP;
+constexpr uint16_t DSHOT_HIGH = 0.75 * DSHOT_PWM_WRAP;
 
 // DShot cmd size is defined to be 16
 constexpr uint32_t DSHOT_CMD_SIZE = 16;
 
 // Frame = DShot command + 0 padding
-constexpr size_t DSHOT_FRAME_LENGTH = DSHOT_CMD_SIZE + 4;
+constexpr unsigned int DSHOT_FRAME_LENGTH = DSHOT_CMD_SIZE + 4;
 
 /*! \brief Maximum time between DShot commands in micro secs
  *  \ingroup config
@@ -44,3 +44,9 @@ constexpr size_t DSHOT_FRAME_LENGTH = DSHOT_CMD_SIZE + 4;
  * TODO: Assert DShot_SPEED / DSHOT_CMD_SIZE > DMA_ALARM_PERIOD
  */
 constexpr uint32_t DMA_ALARM_PERIOD = 1000 / 7;
+
+// --- Throttle ---
+
+constexpr uint16_t ZERO_THROTTLE = 48;  // 0 Throttle code
+constexpr uint16_t MAX_THROTTLE = 2047; // 2^12 - 1
+constexpr uint16_t ARM_THROTTLE = 300;  // < 50% MAX_THROTTLE

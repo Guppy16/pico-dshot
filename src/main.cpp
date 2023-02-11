@@ -55,7 +55,7 @@ void setup()
     // Initialise PWM to ouput 0 signal
     // TODO: start PWM after DMA config
     gpio_set_function(MOTOR_GPIO, GPIO_FUNC_PWM);
-    pwm_set_wrap(pwm_slice_num, DMA_WRAP);
+    pwm_set_wrap(pwm_slice_num, DSHOT_PWM_WRAP);
     pwm_set_chan_level(pwm_slice_num, pwm_channel, 0);    // Set PWM to 0 output
     pwm_set_clkdiv(pwm_slice_num, DEBUG ? 240.0f : 1.0f); // Should run at 500 kHz for cpu-clck = 120 Mhz
     pwm_set_enabled(pwm_slice_num, true);
@@ -98,7 +98,7 @@ void setup()
 
     // Print DShot settings
     Serial.print("DShot: Wrap: ");
-    Serial.print(DMA_WRAP);
+    Serial.print(DSHOT_PWM_WRAP);
     Serial.print(" Low: ");
     Serial.print(DSHOT_LOW);
     Serial.print(" High: ");
@@ -128,9 +128,9 @@ uint32_t temp_dma_buffer[DSHOT_FRAME_LENGTH] = {0};
     // TODO: Check if command can start from 48
     // TODO: Check if command length can be shortened by skipping
 */
-constexpr uint16_t ARM_THROTTLE = 300; // Max is 2000 (or 1999?)
-constexpr uint16_t MAX_THROTTLE = 2000;
-constexpr uint16_t THROTTLE_ZERO = 48; // 0 Throttle code
+// constexpr uint16_t ARM_THROTTLE = 300; // Max is 2000 (or 1999?)
+// constexpr uint16_t MAX_THROTTLE = 2000;
+// constexpr uint16_t ZERO_THROTTLE = 48; // 0 Throttle code
 uint16_t arm_sequence(const uint16_t idx)
 {
 
@@ -226,7 +226,7 @@ void arm_motor()
     uint n = 101 - 1;     // Num of commands to send on rise and fall
 
     // Send 0 command for 200 ms
-    throttle_code = THROTTLE_ZERO;
+    throttle_code = ZERO_THROTTLE;
     telemtry = 0;
     duration = 200; // ms
     target_time = timer_hw->timerawl + duration * 1000;
@@ -239,7 +239,7 @@ void arm_motor()
     telemtry = 0;
     for (uint16_t i = 0; i <= n; ++i)
     {
-        throttle_code = THROTTLE_ZERO + i * (ARM_THROTTLE - THROTTLE_ZERO) / n;
+        throttle_code = ZERO_THROTTLE + i * (ARM_THROTTLE - ZERO_THROTTLE) / n;
         send_dshot_frame();
     }
 
@@ -257,12 +257,12 @@ void arm_motor()
     telemtry = 0;
     for (uint16_t i = n; i < n; --i)
     {
-        throttle_code = THROTTLE_ZERO + i * (ARM_THROTTLE - THROTTLE_ZERO) / n;
+        throttle_code = ZERO_THROTTLE + i * (ARM_THROTTLE - ZERO_THROTTLE) / n;
         send_dshot_frame();
     }
 
-    // Send THROTTLE_ZERO for 500 ms
-    throttle_code = THROTTLE_ZERO;
+    // Send ZERO_THROTTLE for 500 ms
+    throttle_code = ZERO_THROTTLE;
     telemtry = 0;
     duration = 500; // ms
     target_time = timer_hw->timerawl + duration * 1000;
@@ -293,7 +293,7 @@ void ramp_motor()
     telemtry = 0;
     for (uint16_t i = 0; i <= n; ++i)
     {
-        throttle_code = THROTTLE_ZERO + i * (ramp_throttle - THROTTLE_ZERO) / n;
+        throttle_code = ZERO_THROTTLE + i * (ramp_throttle - ZERO_THROTTLE) / n;
         send_dshot_frame();
     }
 
@@ -358,7 +358,7 @@ void loop()
         // r - rise
         if (incomingByte == 114)
         {
-            if (throttle_code >= THROTTLE_ZERO and throttle_code <= MAX_THROTTLE)
+            if (throttle_code >= ZERO_THROTTLE and throttle_code <= MAX_THROTTLE)
             {
                 // Check for max throttle
                 if (throttle_code == MAX_THROTTLE)
@@ -381,9 +381,9 @@ void loop()
         // f - fall
         if (incomingByte == 102)
         {
-            if (throttle_code <= MAX_THROTTLE && throttle_code >= THROTTLE_ZERO)
+            if (throttle_code <= MAX_THROTTLE && throttle_code >= ZERO_THROTTLE)
             {
-                if (throttle_code == THROTTLE_ZERO)
+                if (throttle_code == ZERO_THROTTLE)
                 {
                     Serial.println("Throttle is zero");
                 }
@@ -404,7 +404,7 @@ void loop()
         // Not sure how to disarm yet. Maybe set throttle to 0 and don't send a cmd for some secs?
         if (incomingByte == 32)
         {
-            throttle_code = THROTTLE_ZERO;
+            throttle_code = ZERO_THROTTLE;
             telemtry = 0;
         }
 
