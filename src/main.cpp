@@ -42,7 +42,7 @@ uint16_t telemtry = 0;
 
 void setup()
 {
-    Serial.begin(9600);
+    Serial.begin(115200);
 
     // Flash LED
     utils::flash_led(LED_BUILTIN);
@@ -156,8 +156,6 @@ uint16_t arm_sequence(const uint16_t idx)
     return 0;
 }
 
-
-
 // Helper function to send code to DMA buffer
 uint16_t writes_to_temp_dma_buffer = 0;
 uint16_t writes_to_dma_buffer = 0;
@@ -174,6 +172,7 @@ void send_dshot_frame(bool debug)
 
     // IF DMA is busy, then write to temp_dma_buffer
     // AND wait for DMA buffer to finish transfer
+    // (NOTE: waiting is risky because this is used in an interrupt)
     // Then copy the temp buffer to dma buffer
     if (dma_channel_is_busy(dma_chan))
     {
@@ -304,6 +303,7 @@ void loop()
     if (Serial.available() > 0)
     {
         incomingByte = Serial.read();
+        Serial.print("Byte: ");
         Serial.println(incomingByte, DEC);
 
         // l (led)
@@ -400,7 +400,12 @@ void loop()
             telemtry = 0;
         }
 
+        // NOTE: In Debug mode, sending a DSHOT Frame takes a lot of time!
+        // So it may seem as if the PICO is unable to detect key presses
+        // while sending commands!
+        // But is this even needed?
         send_dshot_frame();
+
         Serial.println("Finished processing byte.");
     }
 }
