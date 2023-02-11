@@ -5,7 +5,7 @@
 #include "inttypes.h"
 
 #define DSHOT_SPEED 1200 // kHz
-#define MCU_FREQ 120     // MHz
+#define MCU_FREQ 120     // MHz. Keep track of MCU_FREQ. This doesn't set it
 #define DMA_ALARM_NUM 1  // HW alarm num for alarm pool
 
 #define DEBUG 0
@@ -19,7 +19,12 @@
 // --- DMA Variables
 // Note that these should be cast uint32_t when sent to the slice
 
-// WRAP = Total number of counts in PWM cycle
+/*! \brief WRAP = Total number of counts in PWM cycle
+ *  \ingroup config
+ *
+ *  WRAP = mcu freq / dshot freq. The factor of 1000 is for MHz -> kHz
+ *  DEBUG = True sets WRAP to maximum value (2^16 - 1) to slow down the signal
+ */
 constexpr uint16_t DSHOT_PWM_WRAP = DEBUG ? (1 << 16) - 1 : 1000 * MCU_FREQ / DSHOT_SPEED;
 
 // Number of counts to represent a digital low

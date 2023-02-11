@@ -1,13 +1,12 @@
 #include <Arduino.h>
-
-#include "config.h"
-
 #include "pico/time.h"
 
-#include "hardware/pwm.h"
 #include "hardware/dma.h"
 #include "hardware/timer.h"
 #include "hardware/irq.h"
+
+#include "config.h"
+#include "tts.h"
 #include "dshot.h"
 #include "utils.h"
 
@@ -20,10 +19,6 @@ void send_dshot_frame(bool = true);
 // DMA config
 int dma_chan = dma_claim_unused_channel(true);
 dma_channel_config dma_conf = dma_channel_get_default_config(dma_chan);
-
-// PWM config
-uint pwm_slice_num = pwm_gpio_to_slice_num(MOTOR_GPIO);
-uint pwm_channel = pwm_gpio_to_channel(MOTOR_GPIO);
 
 // DMA Alarm config
 // ISR to send DShot frame over DMA
@@ -44,6 +39,7 @@ struct repeating_timer send_frame_rt;
 alarm_pool_t *pico_alarm_pool = alarm_pool_create(DMA_ALARM_NUM, PICO_TIME_DEFAULT_ALARM_POOL_MAX_TIMERS);
 uint16_t throttle_code = 0;
 uint16_t telemtry = 0;
+
 void setup()
 {
     Serial.begin(9600);
@@ -52,13 +48,9 @@ void setup()
     utils::flash_led(LED_BUILTIN);
 
     // --- Setup PWM config
-    // Initialise PWM to ouput 0 signal
-    // TODO: start PWM after DMA config
-    gpio_set_function(MOTOR_GPIO, GPIO_FUNC_PWM);
-    pwm_set_wrap(pwm_slice_num, DSHOT_PWM_WRAP);
-    pwm_set_chan_level(pwm_slice_num, pwm_channel, 0);    // Set PWM to 0 output
-    pwm_set_clkdiv(pwm_slice_num, DEBUG ? 240.0f : 1.0f); // Should run at 500 kHz for cpu-clck = 120 Mhz
-    pwm_set_enabled(pwm_slice_num, true);
+    // Should PWM start before or after DMA config?
+    // I think before, so that DMA doesn't write to invalid memory?
+    tts::pwm_setup();
 
     // --- Setup DMA
     // PWM counter compare is 32 bit (16 bit per channel)
@@ -68,7 +60,7 @@ void setup()
     // NO increment write address
     channel_config_set_write_increment(&dma_conf, false);
     // DMA Data request when PWM is finished
-    channel_config_set_dreq(&dma_conf, DREQ_PWM_WRAP0 + pwm_slice_num);
+    channel_config_set_dreq(&dma_conf, DREQ_PWM_WRAP0 + tts::pwm_slice_num);
 
     // Set repeating timer
     dma_alarm_rt_state = alarm_pool_add_repeating_timer_us(pico_alarm_pool, DMA_ALARM_PERIOD, repeating_send_dshot_frame, NULL, &send_frame_rt);
@@ -82,9 +74,9 @@ void setup()
     Serial.println(MOTOR_GPIO);
 
     Serial.print("PWM Slice num: ");
-    Serial.println(pwm_slice_num);
+    Serial.println(tts::pwm_slice_num);
     Serial.print("PWM Channel: ");
-    Serial.println(pwm_channel);
+    Serial.println(tts::pwm_channel);
 
     Serial.print("DMA channel: ");
     Serial.println(dma_chan);
@@ -176,8 +168,8 @@ void send_dshot_frame(bool debug)
 
     if (debug)
     {
-        Serial.print(throttle_code);
-        Serial.print("\t");
+        Serial.print("Throttle Code: ");
+        Serial.println(throttle_code);
     }
 
     // IF DMA is busy, then write to temp_dma_buffer
@@ -185,7 +177,7 @@ void send_dshot_frame(bool debug)
     // Then copy the temp buffer to dma buffer
     if (dma_channel_is_busy(dma_chan))
     {
-        DShot::command_to_pwm_buffer(throttle_code, telemtry, temp_dma_buffer, DSHOT_LOW, DSHOT_HIGH, pwm_channel);
+        DShot::command_to_pwm_buffer(throttle_code, telemtry, temp_dma_buffer, DSHOT_LOW, DSHOT_HIGH, tts::pwm_channel);
         dma_channel_wait_for_finish_blocking(dma_chan);
         memcpy(dma_buffer, temp_dma_buffer, DSHOT_FRAME_LENGTH * sizeof(uint32_t));
         ++writes_to_temp_dma_buffer;
@@ -193,14 +185,14 @@ void send_dshot_frame(bool debug)
     // ELSE write to dma_buffer directly
     else
     {
-        DShot::command_to_pwm_buffer(throttle_code, telemtry, dma_buffer, DSHOT_LOW, DSHOT_HIGH, pwm_channel);
+        DShot::command_to_pwm_buffer(throttle_code, telemtry, dma_buffer, DSHOT_LOW, DSHOT_HIGH, tts::pwm_channel);
         ++writes_to_dma_buffer;
     }
     // Re-configure DMA and trigger transfer
     dma_channel_configure(
         dma_chan,
         &dma_conf,
-        &pwm_hw->slice[pwm_slice_num].cc, // Write to PWM counter compare
+        &pwm_hw->slice[tts::pwm_slice_num].cc, // Write to PWM counter compare
         dma_buffer,
         DSHOT_FRAME_LENGTH,
         true);
