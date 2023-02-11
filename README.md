@@ -70,6 +70,18 @@ NOTE: 32 bit time is used
 - NOTE that this has been the cause of many accidental failures in the past..
 
 ---
+## To Do
+- :tick: Transfer PWM setup to `tts/`
+- [ ] Transfer DMA setup to `tts/`
+- [ ] Transfer repeating timer to `tts/`
+- [ ] Transfer print config to logging / utils? Maybe check `refactor` branch
+- [ ] 
+
+## Backlog
+- [ ] attempt proper arm sequence
+- [ ] Try: DSHOT_SPEED = DEBUG ? 0.008 : 1200 kHz
+
+---
 ## Functions
 
 - :tick: calculating duty cycle of bits from dshot speed
@@ -89,4 +101,3 @@ Command: 1, Tel: 1
 0x0033
 Transmitted from left to right (I think)
 LLLL LLLL LLHH LLHH
-
