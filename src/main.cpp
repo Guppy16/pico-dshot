@@ -42,7 +42,8 @@ bool dma_alarm_rt_state = false;
 struct repeating_timer send_frame_rt;
 // Create alarm pool
 alarm_pool_t *pico_alarm_pool = alarm_pool_create(DMA_ALARM_NUM, PICO_TIME_DEFAULT_ALARM_POOL_MAX_TIMERS);
-
+uint16_t throttle_code = 0;
+uint16_t telemtry = 0;
 void setup()
 {
     Serial.begin(9600);
@@ -163,8 +164,7 @@ uint16_t arm_sequence(const uint16_t idx)
     return 0;
 }
 
-uint16_t throttle_code = 0;
-uint16_t telemtry = 0;
+
 
 // Helper function to send code to DMA buffer
 uint16_t writes_to_temp_dma_buffer = 0;

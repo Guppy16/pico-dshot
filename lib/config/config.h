@@ -11,9 +11,9 @@
 #define DEBUG 0
 
 #if DEBUG
-#define MOTOR_GPIO 14 // BUILTIN_LED
+#define MOTOR_GPIO 25 // BUILTIN_LED
 #else
-#define MOTOR_GPIO 25
+#define MOTOR_GPIO 14
 #endif
 
 // --- DMA Variables
