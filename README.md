@@ -1,5 +1,13 @@
 # Pico DShot
 
+
+## Notes on setting up the repo
+
+- git clone repo
+- git submodule init
+- git submodule update
+- `cd lib/extern/pico-sdk; git submodule update --init` <-- This was required for `TinyUSB`
+
 ---
 ## DShot Protocol
 

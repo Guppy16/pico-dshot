@@ -79,4 +79,3 @@ void tts::print_dma_setup() {
 
   printf("Alarm Period (us): %i", DMA_ALARM_PERIOD);
 }
->>>>>>> 4332d2d (refactor: replace all Arduino methods with standard methods)

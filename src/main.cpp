@@ -70,6 +70,8 @@ void update_signal(int &key_input) {
 }
 
 int main() {
+    int key_input;
+    
     stdio_init_all();
 
     gpio_init(LED_BUILTIN);
