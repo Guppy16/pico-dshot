@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "hardware/clocks.h"
 #include "pico/platform.h"
 #include "pico/stdlib.h"
 #include "shoot.h"
@@ -72,6 +73,10 @@ void update_signal(int &key_input) {
 }
 
 int main() {
+
+  // Set MCU clock frequency. Should we assert this?
+  set_sys_clock_khz(MCU_FREQ * 1e3, false);
+
   int key_input;
 
   stdio_init_all();
@@ -80,11 +85,7 @@ int main() {
   gpio_set_dir(LED_BUILTIN, GPIO_OUT);
 
   // Flash LED on and off 3 times
-  for (int i = 0; i < 3; i++) {
-    utils::flash_led(LED_BUILTIN);
-  }
-
-  sleep_ms(1500);
+  utils::flash_led(LED_BUILTIN, 3);
 
   printf("Setting up dshot\n");
 
@@ -101,9 +102,14 @@ int main() {
   // repeating timer on key press (e.g. a for arm)
   shoot::rt_setup();
 
-  // tts::print_gpio_setup();
-  // tts::print_dshot_setup();
-  // tts::print_dma_setup();
+  sleep_ms(1500);
+
+  printf("MCU Freq (kHz): Expected %d Actual %d", MCU_FREQ * 1000,
+         frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_SYS));
+
+  tts::print_gpio_setup();
+  tts::print_dshot_setup();
+  tts::print_dma_setup();
 
   printf("Initial throttle: %i", shoot::throttle_code);
   printf("\tInitial telemetry: %i", shoot::telemetry);
