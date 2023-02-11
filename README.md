@@ -1,4 +1,6 @@
 # Pico DShot
+This repo is being developed to use a RPi Pico to send dshot commands to ESCs.
+This is a work in progress.
 
 
 ## Setting up the repo
@@ -75,6 +77,7 @@ Dependency Graph:
 - [ ] Explore the idea of using / generating a look up table to convert dshot to pwm counter values (and vice versa for bidir dshot). 
 Can this be hooked up with Programmable IO?
 Memory usage: 2^16 command x 32 bit word = 32k x 64 bit word (that might be too much). 
+- [ ] I believe that the uart and serial are initialised in `stdio_init_all()` (called in `main.cpp`). Perhaps we should use `stdio_usb_init()` and `stdio_uart_init()` separately. For telemetry (not yet committed), Peter used `stdio_uart_init()` after `stdio_init_all()` and didn't have errors.
 
 ---
 ## DShot Protocol

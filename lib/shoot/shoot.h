@@ -53,4 +53,7 @@ void rt_setup();
 // ISR to send DShot frame over DMA
 bool repeating_send_dshot_frame(struct repeating_timer *rt);
 
+// Debug functions
+void print_rt_setup();
+
 }  // namespace shoot

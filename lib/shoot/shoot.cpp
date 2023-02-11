@@ -18,8 +18,13 @@ void shoot::rt_setup() {
     shoot::dma_alarm_rt_state = alarm_pool_add_repeating_timer_us(
         tts::pico_alarm_pool, DMA_ALARM_PERIOD,
         shoot::repeating_send_dshot_frame, NULL, &shoot::send_frame_rt);
+}
 
-    printf("\nDMA Repeating Timer Setup: %d", shoot::dma_alarm_rt_state);
+void shoot::print_rt_setup()
+{
+    printf("\nDMA Repeating Timer Setup: %d\n", shoot::dma_alarm_rt_state);
+    printf("Delay: %li", shoot::send_frame_rt.delay_us);
+    printf("\tAlarm ID: %i\n", shoot::send_frame_rt.alarm_id);
 }
 
 void shoot::send_dshot_frame(bool debug) {
