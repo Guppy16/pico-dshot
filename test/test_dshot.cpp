@@ -91,27 +91,42 @@ void test_command_to_pwm(void)
   uint32_t channel = 0;
   uint16_t DShot_low = 33;
   uint16_t DShot_hi = 75;
-  uint32_t pwm_buffer[18] = {0};
-  uint32_t expected_pwm_buffer[18] = {0};
+  uint32_t buffer_size = 18;
+  uint32_t pwm_buffer[buffer_size] = {0};
+  uint32_t expected_pwm_buffer[buffer_size] = {0};
 
   // Test normal packet with non standard sized array
   // Packet 0b1, start idx: 1
   packet = 0b1;
-  for (int i = 1; i < 18 - 1; ++i){expected_pwm_buffer[i] = DShot_low;}
+  for (int i = 1; i < buffer_size - 1; ++i){expected_pwm_buffer[i] = DShot_low;}
   expected_pwm_buffer[16] = DShot_hi;
   DShot::packet_to_pwm(packet, pwm_buffer + 1, DShot_low, DShot_hi, channel);
-  TEST_ASSERT_EQUAL_HEX32_ARRAY_MESSAGE(expected_pwm_buffer, pwm_buffer, 18, "Packet = 0b1, Channel 0, Array idx: 1");  
+  TEST_ASSERT_EQUAL_HEX32_ARRAY_MESSAGE(expected_pwm_buffer, pwm_buffer, buffer_size, "Packet = 0b1, Channel 0, Array idx: 1");  
+  
+  // Reset packet
+  for (int i = 0; i < buffer_size; ++i){pwm_buffer[i] = 0;}
 
   // Test same but with packet set as so:
   // Command: 1, Telemetry: 1
   // Expected Packet: 0x0033
   // Expected PWM
-  for (int i = 1; i < 18 - 1; ++i){expected_pwm_buffer[i] = DShot_low;}
+  for (int i = 1; i < buffer_size - 1; ++i){expected_pwm_buffer[i] = DShot_low;}
   expected_pwm_buffer[15] = expected_pwm_buffer[16]
   = expected_pwm_buffer[12] = expected_pwm_buffer[11] = DShot_hi;
   packet = DShot::command_to_packet(DShot::dshot_code_telemtry_to_command(1, 1));
   DShot::packet_to_pwm(packet, pwm_buffer + 1, DShot_low, DShot_hi, channel);
-  TEST_ASSERT_EQUAL_HEX32_ARRAY_MESSAGE(expected_pwm_buffer, pwm_buffer, 18, "Packet = 0x0033, Channel 0, Array idx: 1");  
+  TEST_ASSERT_EQUAL_HEX32_ARRAY_MESSAGE(expected_pwm_buffer, pwm_buffer, buffer_size, "Packet = 0x0033, Channel 0, Array idx: 1");  
+
+  // Reset packet
+  for (int i = 0; i < buffer_size; ++i){pwm_buffer[i] = 0;}
+
+  // Repeat the same test as above but using command_to_pwm_buffer
+  // Command: 1, Telemetry: 1
+  // Expected Packet: 0x0033
+  // Expected PWM
+  DShot::command_to_pwm_buffer(1, 1, pwm_buffer + 1, DShot_low, DShot_hi, channel);
+  TEST_ASSERT_EQUAL_HEX32_ARRAY_MESSAGE(expected_pwm_buffer, pwm_buffer, buffer_size, "Code = 1, Telemetry = 1, Channel 0, Array idx: 1");  
+
 }
 
 int runUnityTests(void)

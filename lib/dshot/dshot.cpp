@@ -36,3 +36,16 @@ void DShot::packet_to_pwm(const uint16_t &packet, uint32_t pwm_buffer[], const u
     pwm_buffer[b] = pwm_val << (16 * channel);
   }
 }
+
+/*
+Helper function to convert a DShot code and telemetry
+to PWM values in a buffer
+*/
+void DShot::command_to_pwm_buffer(const uint16_t &code, const uint16_t &telemetry, uint32_t pwm_buffer[], const uint16_t &DShot_low, const uint16_t &DShot_high, const uint32_t &channel){
+  // Get command from DShot code and telemetry
+  uint16_t cmd = DShot::dshot_code_telemtry_to_command(code, telemetry);
+  // Convert command to packet
+  uint16_t packet = DShot::command_to_packet(cmd);
+  // Convert packet to PWM values in buffer
+  DShot::packet_to_pwm(packet, pwm_buffer, DShot_low, DShot_high, channel);
+}

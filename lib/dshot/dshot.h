@@ -13,4 +13,6 @@ namespace DShot
     uint16_t command_to_packet(const uint16_t &cmd);
 
     void packet_to_pwm(const uint16_t &packet, uint32_t pwm_buffer[], const uint16_t &DShot_low, const uint16_t &DShot_high, const uint32_t &channel);
+
+    void command_to_pwm_buffer(const uint16_t &code, const uint16_t &telemetry, uint32_t pwm_buffer[], const uint16_t &DShot_low, const uint16_t &DShot_high, const uint32_t &channel);
 }
