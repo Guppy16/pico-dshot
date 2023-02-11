@@ -12,7 +12,7 @@
 #define MCU_FREQ 120    // MHz. Keep track of MCU_FREQ. This doesn't set it
 #define DMA_ALARM_NUM 1 // HW alarm num for alarm pool
 
-#define DEBUG 1
+#define DEBUG 0
 
 #if DEBUG
 #define MOTOR_GPIO 25 // BUILTIN_LED

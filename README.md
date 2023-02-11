@@ -80,6 +80,8 @@ NOTE: 32 bit time is used
 ## Backlog
 - [ ] attempt proper arm sequence
 - [ ] Try: DSHOT_SPEED = DEBUG ? 0.008 : 1200 kHz
+- [ ] Add validation to ensure PWM, DMA, repeating timer have been setup correctly
+- [ ] Currently dma writes to a PWM counter compare. This actually writes to two dma channels (because upper / lower 16 bits are separate counters). Hence we render one dma channel useless. Is it possible to implement this in a better way?
 
 ---
 ## Functions

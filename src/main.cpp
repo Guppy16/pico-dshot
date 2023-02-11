@@ -5,7 +5,6 @@
 #include "hardware/timer.h"
 #include "hardware/irq.h"
 
-#include "config.h"
 #include "tts.h"
 #include "dshot.h"
 #include "utils.h"
@@ -17,8 +16,8 @@ uint32_t dma_buffer[DSHOT_FRAME_LENGTH] = {0};
 void send_dshot_frame(bool = true);
 
 // DMA config
-int dma_chan = dma_claim_unused_channel(true);
-dma_channel_config dma_conf = dma_channel_get_default_config(dma_chan);
+// int dma_chan = dma_claim_unused_channel(true);
+// dma_channel_config dma_conf = dma_channel_get_default_config(dma_chan);
 
 // DMA Alarm config
 // ISR to send DShot frame over DMA
@@ -47,20 +46,13 @@ void setup()
     // Flash LED
     utils::flash_led(LED_BUILTIN);
 
-    // --- Setup PWM config
+    // pwm config
     // Should PWM start before or after DMA config?
     // I think before, so that DMA doesn't write to invalid memory?
     tts::pwm_setup();
 
-    // --- Setup DMA
-    // PWM counter compare is 32 bit (16 bit per channel)
-    channel_config_set_transfer_data_size(&dma_conf, DMA_SIZE_32);
-    // Increment read address
-    channel_config_set_read_increment(&dma_conf, true);
-    // NO increment write address
-    channel_config_set_write_increment(&dma_conf, false);
-    // DMA Data request when PWM is finished
-    channel_config_set_dreq(&dma_conf, DREQ_PWM_WRAP0 + tts::pwm_slice_num);
+    // dma config
+    tts::dma_setup();
 
     // Set repeating timer
     dma_alarm_rt_state = alarm_pool_add_repeating_timer_us(pico_alarm_pool, DMA_ALARM_PERIOD, repeating_send_dshot_frame, NULL, &send_frame_rt);
@@ -79,7 +71,7 @@ void setup()
     Serial.println(tts::pwm_channel);
 
     Serial.print("DMA channel: ");
-    Serial.println(dma_chan);
+    Serial.println(tts::dma_channel);
     Serial.print("DMA Buffer Length: ");
     Serial.println(DSHOT_FRAME_LENGTH);
 
@@ -174,10 +166,10 @@ void send_dshot_frame(bool debug)
     // AND wait for DMA buffer to finish transfer
     // (NOTE: waiting is risky because this is used in an interrupt)
     // Then copy the temp buffer to dma buffer
-    if (dma_channel_is_busy(dma_chan))
+    if (dma_channel_is_busy(tts::dma_channel))
     {
         DShot::command_to_pwm_buffer(throttle_code, telemtry, temp_dma_buffer, DSHOT_LOW, DSHOT_HIGH, tts::pwm_channel);
-        dma_channel_wait_for_finish_blocking(dma_chan);
+        dma_channel_wait_for_finish_blocking(tts::dma_channel);
         memcpy(dma_buffer, temp_dma_buffer, DSHOT_FRAME_LENGTH * sizeof(uint32_t));
         ++writes_to_temp_dma_buffer;
     }
@@ -189,8 +181,8 @@ void send_dshot_frame(bool debug)
     }
     // Re-configure DMA and trigger transfer
     dma_channel_configure(
-        dma_chan,
-        &dma_conf,
+        tts::dma_channel,
+        &tts::dma_config,
         &pwm_hw->slice[tts::pwm_slice_num].cc, // Write to PWM counter compare
         dma_buffer,
         DSHOT_FRAME_LENGTH,

@@ -1,6 +1,7 @@
 #pragma once
 #include <Arduino.h>
 #include "hardware/pwm.h"
+#include "hardware/dma.h"
 #include "config.h"
 
 namespace tts
@@ -21,4 +22,14 @@ namespace tts
      *  DEBUG sets PWM freq to ~ 8 Hz
      */
     void pwm_setup();
+
+    // DMA config
+
+    const int dma_channel = dma_claim_unused_channel(true);
+    extern dma_channel_config dma_config;
+
+    /*! \brief setup DMA config
+     */
+    void dma_setup();
+
 }
