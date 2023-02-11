@@ -1,5 +1,5 @@
 #pragma once
-#include "inttypes.h"
+#include "stdint.h"
 
 /*
 * Source file for common utility functions used with DShot

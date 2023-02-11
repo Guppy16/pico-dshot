@@ -12,6 +12,7 @@ This is a work in progress.
 
 ## Running the Unit Tests
 
+We use [Unity Test](https://github.com/ThrowTheSwitch/Unity) as the framework for our tests. The CMake file was inspired from the [Rainer Poisel](https://www.poisel.info/posts/2019-07-15-cmake-unity-integration/), [Throw The Switch](http://www.throwtheswitch.org/build/cmake) and [Testing with CMake and CTest](https://cmake.org/cmake/help/book/mastering-cmake/chapter/Testing%20With%20CMake%20and%20CTest.html). 
 Assuming all the submodules have been setup
 
 ```terminal
@@ -66,7 +67,7 @@ Dependency Graph:
 ## Backlog
 - [ ] attempt proper arm sequence
 - [ ] Try: `DSHOT_SPEED = DEBUG ? 0.008 : 1200 // kHz` (this may get rid of some other ternaries on DEBUG)
-- [ ] Add validation to ensure PWM, DMA, repeating timer have been setup correctly
+- [ ] Add validation to ensure PWM, DMA, repeating timer have been setup correctly. MCU_CLK could take in a measured reading. Use `lib/extern/pico-sdk/src/rp2_common/hardware_clocks/scripts/vcocalc.py` to find valid sys clock frequencies.
 - [ ] Currently dma writes to a PWM counter compare. This actually writes to two dma channels (because upper / lower 16 bits are separate counters). Hence we render one dma channel useless. Is it possible to implement this in a better way?
 - [ ] Do we need to use the Arduino framework? Or can we just use the Pico SDK and import libraries 3rd party libs if necessary? If the latter, we could either consider [Wiz IO](https://github.com/Wiz-IO/wizio-pico) or check out [this post](https://community.platformio.org/t/include-pico-stdlib-h-causes-errors/22997). 
 - [ ] Transfer `print_*_setup` functions to logging / utils? Maybe check `refactor` branch. Maybe include the serial printf lib. There is an interesting post on [printable classes](https://forum.arduino.cc/t/printable-classes/438816)
@@ -163,6 +164,7 @@ Possible pico telemetry:
 - [BLHeli dshot special command spec](https://github.com/bitdump/BLHeli/blob/master/BLHeli_32%20ARM/BLHeli_32%20Firmware%20specs/Digital_Cmd_Spec.txt)
 - [Missing Handbook](https://brushlesswhoop.com/dshot-and-bidirectional-dshot/#special-commands) also has a good explanation of commands
 [Original RC Groups post on dshot](https://www.rcgroups.com/forums/showthread.php?2756129-Dshot-testing-a-new-digital-parallel-ESC-throttle-signal)
+- [SiieeFPV](https://www.youtube.com/watch?v=fNLxHWd0Bvg) has a YT vid explaining DMA implementation on a *Kinetis K66*. This vid was a useful in understanding what was needed for our implementation. 
 
 ### Other
 

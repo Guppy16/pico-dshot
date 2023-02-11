@@ -2,7 +2,7 @@
  * File to store main constants
  */
 #pragma once
-#include "inttypes.h"
+#include "stdint.h"
 
 // NOTE: The equivalent DSHOT speed is 8 Hz in DEBUG mode
 // This could be set here directly instead of changing:
