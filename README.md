@@ -22,6 +22,15 @@ The PWM freq is determined by by the DShot speed:
 - DShot150 has f = 150 kHz, etc.
 
 ---
+### DShot Commands
+NOTE: need a good source for this.
+[Temp src](https://brushlesswhoop.com/dshot-and-bidirectional-dshot/#special-commands)
+
+0 - Disarm (though not implemented?)
+1 - 47: reserved for special use
+48 - 2047: Throttle (2000 steps of precision)
+
+---
 ## Functions
 
 - :tick: calculating duty cycle of bits from dshot speed

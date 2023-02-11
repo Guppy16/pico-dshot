@@ -35,6 +35,14 @@ void DShot::packet_to_pwm(const uint16_t &packet, uint32_t pwm_buffer[], const u
     pwm_val = (uint32_t)(((packet << b) & 0x8000) ? DShot_high : DShot_low);
     pwm_buffer[b] = pwm_val << (16 * channel);
   }
+
+  // This is another interesting way to do it (assuming packet is passed as a rvalue)
+  // Source: https://stackoverflow.com/questions/2249731/how-do-i-get-bit-by-bit-data-from-an-integer-value-in-c#:~:text=can%20be%20further-,changed,-to
+  // for (uint32_t b = 0; b < packet_size; ++b, packet <<= 1)
+  // {
+  //   pwm_val = (uint32_t)(((packet << b) & 0x8000) ? DShot_high : DShot_low);
+  //   pwm_buffer[b] = pwm_val << (16 * channel);
+  // }
 }
 
 /*
