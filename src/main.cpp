@@ -59,34 +59,13 @@ void setup()
 
     delay(1500);
 
-    // Print General Settings
-    Serial.print("LED_BUILTIN GPIO: ");
-    Serial.println(LED_BUILTIN);
-    Serial.print("MOTOR GPIO: ");
-    Serial.println(MOTOR_GPIO);
+    tts::print_gpio_setup();
+    tts::print_dshot_setup();
+    tts::print_pwm_setup();
+    tts::print_dma_setup();
 
-    Serial.print("PWM Slice num: ");
-    Serial.println(tts::pwm_slice_num);
-    Serial.print("PWM Channel: ");
-    Serial.println(tts::pwm_channel);
-
-    Serial.print("DMA channel: ");
-    Serial.println(tts::dma_channel);
-    Serial.print("DMA Buffer Length: ");
-    Serial.println(DSHOT_FRAME_LENGTH);
-
-    Serial.print("DMA Repeating Timer Setup: ");
+    Serial.print("\nDMA Repeating Timer Setup: ");
     Serial.print(dma_alarm_rt_state);
-    Serial.print("\tDMA Alarm Period (us): ");
-    Serial.println(DMA_ALARM_PERIOD);
-
-    // Print DShot settings
-    Serial.print("DShot: Wrap: ");
-    Serial.print(DSHOT_PWM_WRAP);
-    Serial.print(" Low: ");
-    Serial.print(DSHOT_LOW);
-    Serial.print(" High: ");
-    Serial.println(DSHOT_HIGH);
 
     Serial.print("Initial throttle: ");
     Serial.print(throttle_code);
