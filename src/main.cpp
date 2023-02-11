@@ -4,28 +4,55 @@
 #include "dshot.h"
 #include "utils.h"
 
-#define DSHOT_SPEED 300  // kHz
-#define MCU_FREQ 120      // MHz
+#define DSHOT_SPEED 600 // kHz
+#define MCU_FREQ 120    // MHz
 
 #define DEBUG 0
 
 // Note that these should be cast uint32_t when sent to the slice
 // WRAP = Total number of counts in PWM cycle
-constexpr uint16_t DMA_WRAP = DEBUG ? (1 << 16) - 1 : 1000 * MCU_FREQ / DSHOT_SPEED; 
-constexpr uint16_t DSHOT_LOW = 0.33 * DMA_WRAP;
+constexpr uint16_t DMA_WRAP = DEBUG ? (1 << 16) - 1 : 1000 * MCU_FREQ / DSHOT_SPEED;
+constexpr uint16_t DSHOT_LOW = 0.37 * DMA_WRAP;
 constexpr uint16_t DSHOT_HIGH = 0.75 * DMA_WRAP;
 
-constexpr uint32_t cmd_repeats = 3000;
+constexpr uint32_t cmd_nums = 1500;
 constexpr uint32_t cmd_size = 20;
-constexpr size_t dma_buffer_length = 18 * cmd_repeats; // 16 bits + 2 stop bits
+constexpr size_t dma_buffer_length = cmd_size * (cmd_nums + 2);
 uint32_t dma_buffer[dma_buffer_length] = {0};
 
-void code_to_dma_buffer(const uint16_t &code, const bool &telemtry, const uint &channel){
-  for (size_t i = 0; i < cmd_repeats; ++i)
+void code_to_dma_buffer(const uint16_t &code, const bool &telemtry, const uint &channel)
+{
+  size_t dma_buffer_idx = 0;
+  // Increase throttle
+  for (size_t i = 0; i < 750; ++i)
   {
-    DShot::command_to_pwm_buffer(code, telemtry, dma_buffer + i * cmd_size, DSHOT_LOW, DSHOT_HIGH, channel);
+    DShot::command_to_pwm_buffer(i, 0, dma_buffer + dma_buffer_idx, DSHOT_LOW, DSHOT_HIGH, channel);
+    dma_buffer_idx += cmd_size;
   }
+
+  // Decrease throttle
+  for (size_t i = 750; i >= 48; --i)
+  {
+    DShot::command_to_pwm_buffer(i, 0, dma_buffer + dma_buffer_idx, DSHOT_LOW, DSHOT_HIGH, channel);
+    dma_buffer_idx += cmd_size;
+  }
+
+  // Keep throttle at 0
+  while (dma_buffer_idx < dma_buffer_length)
+  {
+    DShot::command_to_pwm_buffer(48, 0, dma_buffer + dma_buffer_idx, DSHOT_LOW, DSHOT_HIGH, channel);
+    dma_buffer_idx += cmd_size;
+  }
+
+  // DShot::command_to_pwm_buffer(750, 0, dma_buffer + dma_buffer_idx, DSHOT_LOW, DSHOT_HIGH, channel);
 }
+
+int dma_chan = dma_claim_unused_channel(true);
+dma_channel_config dma_conf = dma_channel_get_default_config(dma_chan);
+
+constexpr uint MOTOR_GPIO = DEBUG ? 25 : 14;
+uint pwm_slice_num = pwm_gpio_to_slice_num(MOTOR_GPIO);
+uint pwm_channel = pwm_gpio_to_channel(MOTOR_GPIO);
 
 void setup()
 {
@@ -34,10 +61,7 @@ void setup()
   utils::flash_led(LED_BUILTIN);
 
   // --- Setup PWM
-  constexpr uint MOTOR_GPIO = DEBUG ? 25: 14;
   gpio_set_function(MOTOR_GPIO, GPIO_FUNC_PWM);
-  uint pwm_slice_num = pwm_gpio_to_slice_num(MOTOR_GPIO);
-  uint pwm_channel = pwm_gpio_to_channel(MOTOR_GPIO);
 
   // Without config method
   // NOTE: pwm should start after DMA initialised!
@@ -60,8 +84,6 @@ void setup()
   code_to_dma_buffer(code, telemetry, pwm_channel);
 
   // --- Setup DMA
-  int dma_chan = dma_claim_unused_channel(true);
-  dma_channel_config dma_conf = dma_channel_get_default_config(dma_chan);
   // PWM counter compare is 32 bit (16 bit per channel)
   channel_config_set_transfer_data_size(&dma_conf, DMA_SIZE_32);
   // Increment read address
@@ -77,11 +99,7 @@ void setup()
       &pwm_hw->slice[pwm_slice_num].cc, // Write to PWM counter compare
       dma_buffer,
       dma_buffer_length,
-      true
-      );
-
-  
-
+      true);
 
   delay(11000);
   Serial.print("LED_BUILTIN GPIO: ");
@@ -113,12 +131,129 @@ void setup()
   Serial.print(DShot::command_to_packet(code << 1 | telemetry), HEX);
   Serial.println();
 
-
   // utils::print_conf(conf);
 }
-
+int incomingByte;
 void loop()
 {
+
+  if (Serial.available() > 0)
+  {
+    incomingByte = Serial.read();
+
+    // l (led)
+    if (incomingByte == 108)
+    {
+      utils::flash_led(LED_BUILTIN);
+    }
+
+    // t (test)
+    if (incomingByte == 116)
+    {
+      code_to_dma_buffer(0, 0, pwm_channel);
+      delay(2000);
+      dma_channel_configure(
+          dma_chan,
+          &dma_conf,
+          &pwm_hw->slice[pwm_slice_num].cc, // Write to PWM counter compare
+          dma_buffer,
+          dma_buffer_length,
+          true);
+      delay(500);
+      dma_channel_configure(
+          dma_chan,
+          &dma_conf,
+          &pwm_hw->slice[pwm_slice_num].cc, // Write to PWM counter compare
+          dma_buffer,
+          dma_buffer_length,
+          true);
+    }
+
+    // a (arm)
+    if (incomingByte == 97)
+    {
+
+      code_to_dma_buffer(0, 0, pwm_channel);
+
+      dma_channel_configure(
+          dma_chan,
+          &dma_conf,
+          &pwm_hw->slice[pwm_slice_num].cc, // Write to PWM counter compare
+          dma_buffer,
+          dma_buffer_length,
+          true);
+    }
+
+    // s (spin)
+    if (incomingByte == 115)
+    {
+      // Reset DMA Buffer
+      for (size_t i = 0; i < dma_buffer_length; ++i)
+      {
+        dma_buffer[i] = 0;
+      }
+
+      // Fill with increasing throttle value
+      size_t dma_buffer_idx = 0;
+      for (size_t i = 48; i < 55; ++i)
+      {
+        DShot::command_to_pwm_buffer(i, 0, dma_buffer + dma_buffer_idx, DSHOT_LOW, DSHOT_HIGH, pwm_channel);
+        dma_buffer_idx += cmd_size;
+      }
+
+      // DShot::command_to_pwm_buffer(750, 0, dma_buffer, DSHOT_LOW, DSHOT_HIGH, pwm_channel);
+
+      dma_channel_configure(
+          dma_chan,
+          &dma_conf,
+          &pwm_hw->slice[pwm_slice_num].cc, // Write to PWM counter compare
+          dma_buffer,
+          dma_buffer_length,
+          true);
+    }
+
+    // b - beep
+    if (incomingByte == 98)
+    {
+      // Reset DMA Buffer
+      for (size_t i = 0; i < dma_buffer_length; ++i)
+      {
+        dma_buffer[i] = 0;
+      }
+
+      DShot::command_to_pwm_buffer(1, 1, dma_buffer, DSHOT_LOW, DSHOT_HIGH, pwm_channel);
+
+      dma_channel_configure(
+          dma_chan,
+          &dma_conf,
+          &pwm_hw->slice[pwm_slice_num].cc, // Write to PWM counter compare
+          dma_buffer,
+          dma_buffer_length,
+          true);
+    }
+
+    // spacebar - disarm?
+    if (incomingByte == 32)
+    {
+      // Reset DMA Buffer
+      for (size_t i = 0; i < dma_buffer_length; ++i)
+      {
+        dma_buffer[i] = 0;
+      }
+
+      DShot::command_to_pwm_buffer(0, 0, dma_buffer, DSHOT_LOW, DSHOT_HIGH, pwm_channel);
+
+      dma_channel_configure(
+          dma_chan,
+          &dma_conf,
+          &pwm_hw->slice[pwm_slice_num].cc, // Write to PWM counter compare
+          dma_buffer,
+          dma_buffer_length,
+          true);
+    }
+
+    Serial.println(incomingByte, DEC);
+  }
 
   // digitalWrite(LED_BUILTIN, HIGH);
   // delay(200);
