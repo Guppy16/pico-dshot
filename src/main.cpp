@@ -11,8 +11,8 @@ void setup()
     utils::flash_led(LED_BUILTIN);
 
     // pwm config
-    // Should PWM start before or after DMA config?
-    // I think before, so that DMA doesn't write to invalid memory?
+    // Note that PWM needs to be setup first, 
+    // because the dma dreq requires tts::pwm_slice_num
     tts::pwm_setup();
 
     // dma config
@@ -37,13 +37,6 @@ void setup()
 }
 
 int incomingByte;
-
-/// NOTE
-// I think arm_sequence should be coded such that it returns
-// a throttle code. This will make the main loop more efficient
-// Note that the state of the arm sequence will still need
-// to be tracked somehow.
-// This could be done efficiently using the first 16 bits!?s
 
 void loop()
 {
