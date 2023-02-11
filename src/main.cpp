@@ -1,8 +1,6 @@
-// This should be defined by default, but it seems to be a bug..
-
-// #define PICO_TIME_DEFAULT_ALARM_POOL_DISABLED 0
-
 #include <Arduino.h>
+
+#include "config.h"
 
 #include "pico/time.h"
 
@@ -13,31 +11,8 @@
 #include "dshot.h"
 #include "utils.h"
 
-#define DSHOT_SPEED 1200 // kHz
-#define MCU_FREQ 120    // MHz
-
-#define DEBUG 0
-
-constexpr uint MOTOR_GPIO = DEBUG ? 25 : 14;
-
-// --- DMA Variables
-
-// Setup Alarms using HW Timers to be used for DMA
-// NOTE: Alarm number and Timer IRQ number have to be the same
-// TODO: Try getting that alarm from the pool.
-#define DMA_ALARM_NUM 1
-// #define DMA_ALARM_IRQ TIMER_IRQ_1
-
-// Note that these should be cast uint32_t when sent to the slice
-// WRAP = Total number of counts in PWM cycle
-constexpr uint16_t DMA_WRAP = DEBUG ? (1 << 16) - 1 : 1000 * MCU_FREQ / DSHOT_SPEED;
-constexpr uint16_t DSHOT_LOW = 0.37 * DMA_WRAP;
-constexpr uint16_t DSHOT_HIGH = 0.75 * DMA_WRAP;
-
-constexpr uint32_t DSHOT_CMD_SIZE = 16;
-constexpr size_t dma_buffer_length = DSHOT_CMD_SIZE + 4;
 // TODO: Does this ever need to be volatile?
-uint32_t dma_buffer[dma_buffer_length] = {0};
+uint32_t dma_buffer[DSHOT_FRAME_LENGTH] = {0};
 
 // TODO: Change default behviour to: bool debug = false
 void send_dshot_frame(bool = true);
@@ -50,59 +25,23 @@ dma_channel_config dma_conf = dma_channel_get_default_config(dma_chan);
 uint pwm_slice_num = pwm_gpio_to_slice_num(MOTOR_GPIO);
 uint pwm_channel = pwm_gpio_to_channel(MOTOR_GPIO);
 
-// Somehow Assert that DShot_SPEED / DSHOT_CMD_SIZE > timer_rate
-
-// Timer interrupt at 8 kHz
-// Every interrupt will send the previous command
-// And reset the interrupt
-// Ideally should be 8 kHz
-// NOTE: this freq is too high is using DSHOT 150!!
-constexpr uint32_t DMA_ALARM_PERIOD = 1000 / 1; // N kHz -> micro secs
-
-// ISR to send frame over DMA
-// Create alarm pool
-alarm_pool_t *pico_alarm_pool = alarm_pool_create(DMA_ALARM_NUM, PICO_TIME_DEFAULT_ALARM_POOL_MAX_TIMERS);
-
-// alarm_pool_t *pico_alarm_pool = alarm_pool_get_default();
-struct repeating_timer send_frame_rt;
-
-bool repeating_send_dshot_frame(struct repeating_timer *t)
+// DMA Alarm config
+// ISR to send DShot frame over DMA
+bool repeating_send_dshot_frame(struct repeating_timer *rt)
 {
     // Send DShot frame
     send_dshot_frame(false);
-
-    // Some debugging using repeating_timer struct
-
+    // CAN DO: Use rt-> for debug
     // Return true so that timer repeats
     return true;
 }
 
-// TODO: Check if irq_set_enabled is needed? Maybe it only needs to be configured once?
-/*
-void alarm_irq_send_dma_frame(void)
-{
-    // Clear the alarm irq
-    hw_clear_bits(&timer_hw->intr, 1u << DMA_ALARM_NUM);
-
-    // Change state of LED??
-
-    // Re-set DMA read address AND set trigger
-    // to start sending the frame again
-    dma_channel_set_read_addr(dma_chan, dma_buffer, true);
-
-    // -- Reset the alarm
-    // Enable the alarm irq
-    irq_set_enabled(DMA_ALARM_IRQ, true);
-
-    // NOTE: Alarm is only 32 bits
-    // so, be careful if delay is more than that
-    uint64_t target = timer_hw->timerawl + DMA_ALARM_PERIOD;
-    timer_hw->alarm[DMA_ALARM_NUM] = (uint32_t)target;
-}
-*/
-
-// Keep track repeating timer status
+// Keep track of repeating timer status
 bool dma_alarm_rt_state = false;
+// Setup a repeating timer configuration
+struct repeating_timer send_frame_rt;
+// Create alarm pool
+alarm_pool_t *pico_alarm_pool = alarm_pool_create(DMA_ALARM_NUM, PICO_TIME_DEFAULT_ALARM_POOL_MAX_TIMERS);
 
 void setup()
 {
@@ -130,17 +69,8 @@ void setup()
     // DMA Data request when PWM is finished
     channel_config_set_dreq(&dma_conf, DREQ_PWM_WRAP0 + pwm_slice_num);
 
-    // --- Setup Alarm to send DMA frame
-    // Enable interrupt for alarm
-    // hw_set_bits(&timer_hw->inte, 1u << DMA_ALARM_NUM);
-    // Set irq handler for alarm irq
-    // irq_set_exclusive_handler(DMA_ALARM_IRQ, alarm_irq_send_dma_frame);
-    // Enable the alarm irq
-    // irq_set_enabled(DMA_ALARM_IRQ, true);
-
     // Set repeating timer
     dma_alarm_rt_state = alarm_pool_add_repeating_timer_us(pico_alarm_pool, DMA_ALARM_PERIOD, repeating_send_dshot_frame, NULL, &send_frame_rt);
-    // dma_alarm_rt_state = add_repeating_timer_us(DMA_ALARM_PERIOD, repeating_send_dshot_frame, NULL, &send_frame_rt);
 
     delay(1500);
 
@@ -158,7 +88,7 @@ void setup()
     Serial.print("DMA channel: ");
     Serial.println(dma_chan);
     Serial.print("DMA Buffer Length: ");
-    Serial.println(dma_buffer_length);
+    Serial.println(DSHOT_FRAME_LENGTH);
 
     Serial.print("DMA Repeating Timer Setup: ");
     Serial.print(dma_alarm_rt_state);
@@ -177,14 +107,10 @@ void setup()
     Serial.print(throttle_code);
     Serial.print("\tInitial telemetry: ");
     Serial.println(telemtry);
-
-    // Start the dma transfer interrupt
-    // alarm_irq_send_dma_frame();
 }
 
 int incomingByte;
-uint32_t dma_buffer_length_temp[dma_buffer_length] = {0};
-uint32_t temp_dma_buffer[dma_buffer_length] = {0};
+uint32_t temp_dma_buffer[DSHOT_FRAME_LENGTH] = {0};
 
 /// NOTE
 // I think arm_sequence should be coded such that it returns
@@ -261,7 +187,7 @@ void send_dshot_frame(bool debug)
     {
         DShot::command_to_pwm_buffer(throttle_code, telemtry, temp_dma_buffer, DSHOT_LOW, DSHOT_HIGH, pwm_channel);
         dma_channel_wait_for_finish_blocking(dma_chan);
-        memcpy(dma_buffer, temp_dma_buffer, dma_buffer_length * sizeof(uint32_t));
+        memcpy(dma_buffer, temp_dma_buffer, DSHOT_FRAME_LENGTH * sizeof(uint32_t));
         ++writes_to_temp_dma_buffer;
     }
     // ELSE write to dma_buffer directly
@@ -276,7 +202,7 @@ void send_dshot_frame(bool debug)
         &dma_conf,
         &pwm_hw->slice[pwm_slice_num].cc, // Write to PWM counter compare
         dma_buffer,
-        dma_buffer_length,
+        DSHOT_FRAME_LENGTH,
         true);
 
     // Restart interrupt
