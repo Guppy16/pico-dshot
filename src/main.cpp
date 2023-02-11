@@ -17,6 +17,7 @@ constexpr uint MOTOR_GPIO = DEBUG ? 25 : 14;
 // #define PICO_TIME_DEFAULT_ALARM_POOL_DISABLED 1
 // Setup Alarms using HW Timers to be used for DMA
 // NOTE: Alarm number and Timer IRQ number have to be the same
+// TODO: Try getting that alarm from the pool. 
 #define DMA_ALARM_NUM 1
 #define DMA_ALARM_IRQ TIMER_IRQ_1
 
@@ -239,7 +240,6 @@ void send_dshot_frame()
 // Helper function to arm motor
 void arm_motor()
 {
-
     // Debugging
     writes_to_temp_dma_buffer = 0;
     writes_to_dma_buffer = 0;
@@ -259,7 +259,6 @@ void arm_motor()
 
     // Increase throttle from 0 from to ARM_THROTTLE for 100 steps
     // < 20 ms time for Dshot 150, 20 bit frame length, n = 100
-    n = 100;
     telemtry = 0;
     for (uint16_t i = 0; i <= n; ++i)
     {
@@ -278,7 +277,6 @@ void arm_motor()
 
     // Decrease throttle to 48
     // < 20 ms time for Dshot 150, 20 bit frame length, n = 100
-    n = 100;
     telemtry = 0;
     for (uint16_t i = n; i < n; --i)
     {
@@ -300,6 +298,36 @@ void arm_motor()
     Serial.println(writes_to_temp_dma_buffer);
     Serial.print("Writes to dma buffer: ");
     Serial.println(writes_to_dma_buffer);
+}
+
+void ramp_motor()
+{
+    // Debugging
+    writes_to_temp_dma_buffer = 0;
+    writes_to_dma_buffer = 0;
+
+    uint64_t duration;    // milli seconds
+    uint64_t target_time; // micro seconds
+    uint n = 101 - 1;     // Num of commands to send on rise and fall
+
+    // Increase throttle from 0 from to ARM_THROTTLE + 100 in 100 steps
+    // < 20 ms time for Dshot 150, 20 bit frame length, n = 100
+    uint16_t ramp_throttle = ARM_THROTTLE + 100;
+    telemtry = 0;
+    for (uint16_t i = 0; i <= n; ++i)
+    {
+        throttle_code = THROTTLE_ZERO + i * (ramp_throttle - THROTTLE_ZERO) / n;
+        send_dshot_frame();
+    }
+
+    // Maintain this throttle for 500 ms
+    throttle_code = ramp_throttle;
+    telemtry = 0;
+    duration = 500; // ms
+    target_time = timer_hw->timerawl + duration * 1000;
+    // TODO: re implement as a timer interrupt
+    while (timer_hw->timerawl < target_time)
+        send_dshot_frame();
 }
 
 void loop()
@@ -330,9 +358,10 @@ void loop()
         }
 
         // r - ramp
-        if (incomingByte == 115)
+        if (incomingByte == 114)
         {
-            // Ramp up to speed = 400
+            // Ramp up to speed ARM_THROTTLE + 100
+            ramp_motor();
         }
 
         // spacebar = 0 throttle --> This could be disarm.
