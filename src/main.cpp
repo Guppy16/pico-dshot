@@ -7,109 +7,109 @@
 
 void update_signal(int &key_input) {
 
-    // l (led)
-    if (key_input == 108) {
-        utils::flash_led(LED_BUILTIN);
+  // l (led)
+  if (key_input == 108) {
+    utils::flash_led(LED_BUILTIN);
+  }
+
+  // b - beep
+  if (key_input == 98) {
+    shoot::throttle_code = 1;
+    shoot::telemetry = 1;
+  }
+
+  // r - rise
+  if (key_input == 114) {
+    if (shoot::throttle_code >= ZERO_THROTTLE and
+        shoot::throttle_code <= MAX_THROTTLE) {
+
+      shoot::throttle_code =
+          MIN(shoot::throttle_code + THROTTLE_INCREMENT, MAX_THROTTLE);
+      // Check for max throttle
+      if (shoot::throttle_code == MAX_THROTTLE) {
+        printf("Max Throttle reached\n");
+      } else {
+        printf("Throttle: %i\n", shoot::throttle_code - ZERO_THROTTLE);
+      }
+    } else {
+      printf("Motor is not in throttle mode\n");
     }
+  }
 
-    // b - beep
-    if (key_input == 98) {
-        shoot::throttle_code = 1;
-        shoot::telemetry = 1;
+  // f - fall
+  if (key_input == 102) {
+    if (shoot::throttle_code <= MAX_THROTTLE &&
+        shoot::throttle_code >= ZERO_THROTTLE) {
+
+      shoot::throttle_code =
+          MAX(shoot::throttle_code - THROTTLE_INCREMENT, ZERO_THROTTLE);
+      // Check if min throttle reached
+      if (shoot::throttle_code == ZERO_THROTTLE) {
+        printf("Throttle is zero\n");
+      } else {
+        printf("Throttle: %i\n", shoot::throttle_code - ZERO_THROTTLE);
+      }
+    } else {
+      printf("Motor is not in throttle mode\n");
     }
+  }
 
-    // r - rise
-    if (key_input == 114) {
-        if (shoot::throttle_code >= ZERO_THROTTLE and
-            shoot::throttle_code <= MAX_THROTTLE) {
-            // Check for max throttle
-            if (shoot::throttle_code == MAX_THROTTLE) {
-                printf("Max Throttle reached\n");
-            } else {
-                shoot::throttle_code = MIN(
-                    shoot::throttle_code + THROTTLE_INCREMENT, MAX_THROTTLE);
-                if (shoot::throttle_code > MAX_THROTTLE)
-                    shoot::throttle_code = MAX_THROTTLE;
-                printf("Throttle: %i\n", shoot::throttle_code - ZERO_THROTTLE);
-            }
-        } else {
-            printf("Motor is not in throttle mode\n");
-        }
-    }
+  // q - send zero throttle
+  if (key_input == 32) {
+    shoot::throttle_code = ZERO_THROTTLE;
+    shoot::telemetry = 0;
+    printf("Throttle: %i\n", 0);
+  }
 
-    // f - fall
-    if (key_input == 102) {
-        if (shoot::throttle_code <= MAX_THROTTLE &&
-            shoot::throttle_code >= ZERO_THROTTLE) {
-            if (shoot::throttle_code == ZERO_THROTTLE) {
-                printf("Throttle is zero\n");
-            } else {
-                shoot::throttle_code = MIN(
-                    shoot::throttle_code - THROTTLE_INCREMENT, ZERO_THROTTLE);
-                printf("Throttle: %i\n", shoot::throttle_code - ZERO_THROTTLE);
-            }
-        } else {
-            printf("Motor is not in throttle mode\n");
-        }
-    }
+  // NOTE: In DEBUG mode, sending a DSHOT Frame takes a lot of time!
+  // So it may seem as if the PICO is unable to detect key presses
+  // while sending commands!
+  // But is this even needed?
+  shoot::send_dshot_frame();
 
-    // q - send zero throttle
-    if (key_input == 32) {
-        shoot::throttle_code = ZERO_THROTTLE;
-        shoot::telemetry = 0;
-        printf("Throttle: %i\n", 0);
-    }
-
-    // NOTE: In DEBUG mode, sending a DSHOT Frame takes a lot of time!
-    // So it may seem as if the PICO is unable to detect key presses
-    // while sending commands!
-    // But is this even needed?
-    shoot::send_dshot_frame();
-
-    printf("Finished processing byte.\n");
+  printf("Finished processing byte.\n");
 }
 
 int main() {
-    int key_input;
-    
-    stdio_init_all();
+  int key_input;
 
-    gpio_init(LED_BUILTIN);
-    gpio_set_dir(LED_BUILTIN, GPIO_OUT);
+  stdio_init_all();
 
-    // Flash LED on and off 3 times
-    for (int i = 0; i < 3; i++) {
-        utils::flash_led(LED_BUILTIN);
-    }
+  gpio_init(LED_BUILTIN);
+  gpio_set_dir(LED_BUILTIN, GPIO_OUT);
 
-    sleep_ms(1500);
+  // Flash LED on and off 3 times
+  for (int i = 0; i < 3; i++) {
+    utils::flash_led(LED_BUILTIN);
+  }
 
-    printf("Setting up dshot\n");
-    
-    // pwm config
-    // Note that PWM needs to be setup first,
-    // because the dma dreq requires tts::pwm_slice_num
-    tts::pwm_setup();
+  sleep_ms(1500);
 
-    // dma config
-    tts::dma_setup();
+  printf("Setting up dshot\n");
 
-    // Set repeating timer
-    // NOTE: this can be put in main loop to start
-    // repeating timer on key press (e.g. a for arm)
-    shoot::rt_setup();
+  // pwm config
+  // Note that PWM needs to be setup first,
+  // because the dma dreq requires tts::pwm_slice_num
+  tts::pwm_setup();
 
-    // tts::print_gpio_setup();
-    // tts::print_dshot_setup();
-    // tts::print_dma_setup();
+  // dma config
+  tts::dma_setup();
 
-    printf("Initial throttle: %i", shoot::throttle_code);
-    printf("\tInitial telemetry: %i", shoot::telemetry);
+  // Set repeating timer
+  // NOTE: this can be put in main loop to start
+  // repeating timer on key press (e.g. a for arm)
+  shoot::rt_setup();
 
-    while (1) {
-        key_input = getchar_timeout_us(0);
-        update_signal(key_input);
-        sleep_ms(100);
-    }
+  // tts::print_gpio_setup();
+  // tts::print_dshot_setup();
+  // tts::print_dma_setup();
+
+  printf("Initial throttle: %i", shoot::throttle_code);
+  printf("\tInitial telemetry: %i", shoot::telemetry);
+
+  while (1) {
+    key_input = getchar_timeout_us(0);
+    update_signal(key_input);
+    sleep_ms(100);
+  }
 }
-
