@@ -2,69 +2,39 @@
 #include "hardware/pwm.h"
 #include "hardware/dma.h"
 #include "dshot.h"
+#include "utils.h"
 
-#define DSHOT_SPEED 1200  // kHz
+#define DSHOT_SPEED 300  // kHz
 #define MCU_FREQ 120      // MHz
 
 #define DEBUG 0
 
-// Note that these should be casted uint32_t when sent to the slice
-constexpr uint16_t DMA_WRAP = DEBUG ? (1 << 16) - 1 : 1000 * MCU_FREQ / DSHOT_SPEED; // Total number of counts in PWM cycle
-// For visualisation purposes:
-// constexpr uint16_t DMA_WRAP = (1 << 16) - 1;
+// Note that these should be cast uint32_t when sent to the slice
+// WRAP = Total number of counts in PWM cycle
+constexpr uint16_t DMA_WRAP = DEBUG ? (1 << 16) - 1 : 1000 * MCU_FREQ / DSHOT_SPEED; 
 constexpr uint16_t DSHOT_LOW = 0.33 * DMA_WRAP;
 constexpr uint16_t DSHOT_HIGH = 0.75 * DMA_WRAP;
 
-constexpr size_t dma_buffer_length = 18; // 16 bits + 2 stop bits
-uint32_t dma_buffer[dma_buffer_length];
+constexpr uint32_t cmd_repeats = 3000;
+constexpr uint32_t cmd_size = 20;
+constexpr size_t dma_buffer_length = 18 * cmd_repeats; // 16 bits + 2 stop bits
+uint32_t dma_buffer[dma_buffer_length] = {0};
 
 void code_to_dma_buffer(const uint16_t &code, const bool &telemtry, const uint &channel){
-  // Combine code with telemetry
-  uint16_t cmd = code << 1 | telemtry;
-  // Convert code to packet
-  uint16_t packet = DShot::command_to_packet(cmd);
-
-  // Convert packet to PWM values
-  uint32_t pwm_val = 0;
-  dma_buffer[0] = pwm_val;
-  dma_buffer[dma_buffer_length - 1] = pwm_val;
-  DShot::packet_to_pwm(packet, dma_buffer + 1, DSHOT_LOW, DSHOT_HIGH, channel);
-  // for (size_t b = 0; b < 16; ++b){
-  //   pwm_val = (uint32_t) (((packet >> b) & 1) ? DSHOT_HIGH : DSHOT_LOW);
-  //   dma_buffer[b + 1] = pwm_val << (16 * channel);
-  // }
-}
-
-void print_conf(const pwm_config &conf)
-{
-  Serial.print("Conf: ");
-  Serial.print("csr: ");
-  Serial.print(conf.csr);
-  Serial.print(" div: ");
-  Serial.print(conf.div);
-  Serial.print(" top: ");
-  Serial.print(conf.top);
-  Serial.println();
-}
-
-void flash_led()
-{
-  // put your setup code here, to run once:
-  pinMode(LED_BUILTIN, OUTPUT);
-  digitalWrite(LED_BUILTIN, HIGH);
-  delay(1000);
-  digitalWrite(LED_BUILTIN, LOW);
+  for (size_t i = 0; i < cmd_repeats; ++i)
+  {
+    DShot::command_to_pwm_buffer(code, telemtry, dma_buffer + i * cmd_size, DSHOT_LOW, DSHOT_HIGH, channel);
+  }
 }
 
 void setup()
 {
   Serial.begin(9600);
   // Flash LED
-  flash_led();
+  utils::flash_led(LED_BUILTIN);
 
   // --- Setup PWM
-  // constexpr uint MOTOR_GPIO = 14;
-  constexpr uint MOTOR_GPIO = DEBUG ? 14: 14;
+  constexpr uint MOTOR_GPIO = DEBUG ? 25: 14;
   gpio_set_function(MOTOR_GPIO, GPIO_FUNC_PWM);
   uint pwm_slice_num = pwm_gpio_to_slice_num(MOTOR_GPIO);
   uint pwm_channel = pwm_gpio_to_channel(MOTOR_GPIO);
@@ -84,16 +54,9 @@ void setup()
   // pwm_init(pwm_slice_num, &conf, true);
   // pwm_set_chan_level(pwm_slice_num, pwm_channel, 2);
 
-  // Other tests
-  // pwm_config_set_clkdiv(&conf, 100.0f);
-  // uint16_t max_uint16_t = (int)((int)(1 << 16) - 1);
-  // Serial.print("TOP: "); Serial.println(max_uint16_t);
-  // pwm_set_wrap(pwm_slice_num, max_uint16_t);
-  // pwm_set_chan_level(pwm_slice_num, pwm_channel, 1 << 15);
-
   // --- Setup DMA packet
-  uint16_t code = 1;
-  bool telemetry = 1;
+  uint16_t code = 0;
+  bool telemetry = 0;
   code_to_dma_buffer(code, telemetry, pwm_channel);
 
   // --- Setup DMA
@@ -117,6 +80,7 @@ void setup()
       true
       );
 
+  
 
 
   delay(11000);
@@ -150,7 +114,7 @@ void setup()
   Serial.println();
 
 
-  // print_conf(conf);
+  // utils::print_conf(conf);
 }
 
 void loop()
