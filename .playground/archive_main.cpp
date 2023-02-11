@@ -17,8 +17,8 @@ constexpr uint16_t DSHOT_HIGH = 0.75 * DMA_WRAP;
 
 constexpr uint32_t cmd_nums = 1403;
 constexpr uint32_t cmd_size = 20;
-constexpr size_t dma_buffer_length = cmd_size * (cmd_nums + 2);
-uint32_t dma_buffer[dma_buffer_length] = {0};
+constexpr size_t DSHOT_FRAME_LENGTH = cmd_size * (cmd_nums + 2);
+uint32_t dma_buffer[DSHOT_FRAME_LENGTH] = {0};
 
 void code_to_dma_buffer(const uint16_t &code, const bool &telemtry, const uint &channel)
 {
@@ -61,7 +61,7 @@ void code_to_dma_buffer(const uint16_t &code, const bool &telemtry, const uint &
     dma_buffer_idx += cmd_size;
   }
 
-  // while (dma_buffer_idx < dma_buffer_length)
+  // while (dma_buffer_idx < DSHOT_FRAME_LENGTH)
   // {
   //   Serial.print(48);
   //   Serial.print("\t");
@@ -93,7 +93,7 @@ int64_t alarm_callback(alarm_id_t id, void *user_data)
       &dma_conf,
       &pwm_hw->slice[pwm_slice_num].cc, // Write to PWM counter compare
       dma_buffer,
-      dma_buffer_length,
+      DSHOT_FRAME_LENGTH,
       true);
 
   // Switch LED state
@@ -143,7 +143,7 @@ void setup()
       &dma_conf,
       &pwm_hw->slice[pwm_slice_num].cc, // Write to PWM counter compare
       dma_buffer,
-      dma_buffer_length,
+      DSHOT_FRAME_LENGTH,
       true);
 
   delay(2000);
@@ -166,7 +166,7 @@ void setup()
   Serial.print(" High: ");
   Serial.println(DSHOT_HIGH);
   Serial.print("DMA Buffer Length: ");
-  Serial.println(dma_buffer_length);
+  Serial.println(DSHOT_FRAME_LENGTH);
 
   // Print packet setup
   Serial.print("Packet Setup:");
@@ -204,7 +204,7 @@ void loop()
           &dma_conf,
           &pwm_hw->slice[pwm_slice_num].cc, // Write to PWM counter compare
           dma_buffer,
-          dma_buffer_length,
+          DSHOT_FRAME_LENGTH,
           true);
       delay(500);
       dma_channel_configure(
@@ -212,7 +212,7 @@ void loop()
           &dma_conf,
           &pwm_hw->slice[pwm_slice_num].cc, // Write to PWM counter compare
           dma_buffer,
-          dma_buffer_length,
+          DSHOT_FRAME_LENGTH,
           true);
     }
 
@@ -227,7 +227,7 @@ void loop()
           &dma_conf,
           &pwm_hw->slice[pwm_slice_num].cc, // Write to PWM counter compare
           dma_buffer,
-          dma_buffer_length,
+          DSHOT_FRAME_LENGTH,
           true);
     }
 
@@ -235,7 +235,7 @@ void loop()
     if (incomingByte == 115)
     {
       // Reset DMA Buffer
-      for (size_t i = 0; i < dma_buffer_length; ++i)
+      for (size_t i = 0; i < DSHOT_FRAME_LENGTH; ++i)
       {
         dma_buffer[i] = 0;
       }
@@ -255,7 +255,7 @@ void loop()
           &dma_conf,
           &pwm_hw->slice[pwm_slice_num].cc, // Write to PWM counter compare
           dma_buffer,
-          dma_buffer_length,
+          DSHOT_FRAME_LENGTH,
           true);
     }
 
@@ -263,7 +263,7 @@ void loop()
     if (incomingByte == 98)
     {
       // Reset DMA Buffer
-      for (size_t i = 0; i < dma_buffer_length; ++i)
+      for (size_t i = 0; i < DSHOT_FRAME_LENGTH; ++i)
       {
         dma_buffer[i] = 0;
       }
@@ -275,7 +275,7 @@ void loop()
           &dma_conf,
           &pwm_hw->slice[pwm_slice_num].cc, // Write to PWM counter compare
           dma_buffer,
-          dma_buffer_length,
+          DSHOT_FRAME_LENGTH,
           true);
     }
 
@@ -283,7 +283,7 @@ void loop()
     if (incomingByte == 32)
     {
       // Reset DMA Buffer
-      for (size_t i = 0; i < dma_buffer_length; ++i)
+      for (size_t i = 0; i < DSHOT_FRAME_LENGTH; ++i)
       {
         dma_buffer[i] = 0;
       }
@@ -295,7 +295,7 @@ void loop()
           &dma_conf,
           &pwm_hw->slice[pwm_slice_num].cc, // Write to PWM counter compare
           dma_buffer,
-          dma_buffer_length,
+          DSHOT_FRAME_LENGTH,
           true);
     }
 
