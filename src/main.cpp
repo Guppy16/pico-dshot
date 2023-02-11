@@ -1,4 +1,11 @@
+// This should be defined by default, but it seems to be a bug..
+
+// #define PICO_TIME_DEFAULT_ALARM_POOL_DISABLED 0
+
 #include <Arduino.h>
+
+#include "pico/time.h"
+
 #include "hardware/pwm.h"
 #include "hardware/dma.h"
 #include "hardware/timer.h"
@@ -6,7 +13,7 @@
 #include "dshot.h"
 #include "utils.h"
 
-#define DSHOT_SPEED 150 // kHz
+#define DSHOT_SPEED 1200 // kHz
 #define MCU_FREQ 120    // MHz
 
 #define DEBUG 0
@@ -14,12 +21,12 @@
 constexpr uint MOTOR_GPIO = DEBUG ? 25 : 14;
 
 // --- DMA Variables
-// #define PICO_TIME_DEFAULT_ALARM_POOL_DISABLED 1
+
 // Setup Alarms using HW Timers to be used for DMA
 // NOTE: Alarm number and Timer IRQ number have to be the same
-// TODO: Try getting that alarm from the pool. 
+// TODO: Try getting that alarm from the pool.
 #define DMA_ALARM_NUM 1
-#define DMA_ALARM_IRQ TIMER_IRQ_1
+// #define DMA_ALARM_IRQ TIMER_IRQ_1
 
 // Note that these should be cast uint32_t when sent to the slice
 // WRAP = Total number of counts in PWM cycle
@@ -31,6 +38,9 @@ constexpr uint32_t DSHOT_CMD_SIZE = 16;
 constexpr size_t dma_buffer_length = DSHOT_CMD_SIZE + 4;
 // TODO: Does this ever need to be volatile?
 uint32_t dma_buffer[dma_buffer_length] = {0};
+
+// TODO: Change default behviour to: bool debug = false
+void send_dshot_frame(bool = true);
 
 // DMA config
 int dma_chan = dma_claim_unused_channel(true);
@@ -45,10 +55,28 @@ uint pwm_channel = pwm_gpio_to_channel(MOTOR_GPIO);
 // Timer interrupt at 8 kHz
 // Every interrupt will send the previous command
 // And reset the interrupt
+// Ideally should be 8 kHz
 // NOTE: this freq is too high is using DSHOT 150!!
-constexpr uint32_t DMA_ALARM_PERIOD = 1000 / 8; // 8 kHz --> micro secs
+constexpr uint32_t DMA_ALARM_PERIOD = 1000 / 1; // N kHz -> micro secs
 
 // ISR to send frame over DMA
+// Create alarm pool
+alarm_pool_t *pico_alarm_pool = alarm_pool_create(DMA_ALARM_NUM, PICO_TIME_DEFAULT_ALARM_POOL_MAX_TIMERS);
+
+// alarm_pool_t *pico_alarm_pool = alarm_pool_get_default();
+struct repeating_timer send_frame_rt;
+
+bool repeating_send_dshot_frame(struct repeating_timer *t)
+{
+    // Send DShot frame
+    send_dshot_frame(false);
+
+    // Some debugging using repeating_timer struct
+
+    // Return true so that timer repeats
+    return true;
+}
+
 // TODO: Check if irq_set_enabled is needed? Maybe it only needs to be configured once?
 /*
 void alarm_irq_send_dma_frame(void)
@@ -72,6 +100,9 @@ void alarm_irq_send_dma_frame(void)
     timer_hw->alarm[DMA_ALARM_NUM] = (uint32_t)target;
 }
 */
+
+// Keep track repeating timer status
+bool dma_alarm_rt_state = false;
 
 void setup()
 {
@@ -107,6 +138,10 @@ void setup()
     // Enable the alarm irq
     // irq_set_enabled(DMA_ALARM_IRQ, true);
 
+    // Set repeating timer
+    dma_alarm_rt_state = alarm_pool_add_repeating_timer_us(pico_alarm_pool, DMA_ALARM_PERIOD, repeating_send_dshot_frame, NULL, &send_frame_rt);
+    // dma_alarm_rt_state = add_repeating_timer_us(DMA_ALARM_PERIOD, repeating_send_dshot_frame, NULL, &send_frame_rt);
+
     delay(1500);
 
     // Print General Settings
@@ -114,15 +149,20 @@ void setup()
     Serial.println(LED_BUILTIN);
     Serial.print("MOTOR GPIO: ");
     Serial.println(MOTOR_GPIO);
+
     Serial.print("PWM Slice num: ");
     Serial.println(pwm_slice_num);
     Serial.print("PWM Channel: ");
     Serial.println(pwm_channel);
+
     Serial.print("DMA channel: ");
     Serial.println(dma_chan);
     Serial.print("DMA Buffer Length: ");
     Serial.println(dma_buffer_length);
-    Serial.print("DMA Alarm Period (us): ");
+
+    Serial.print("DMA Repeating Timer Setup: ");
+    Serial.print(dma_alarm_rt_state);
+    Serial.print("\tDMA Alarm Period (us): ");
     Serial.println(DMA_ALARM_PERIOD);
 
     // Print DShot settings
@@ -132,6 +172,11 @@ void setup()
     Serial.print(DSHOT_LOW);
     Serial.print(" High: ");
     Serial.println(DSHOT_HIGH);
+
+    Serial.print("Initial throttle: ");
+    Serial.print(throttle_code);
+    Serial.print("\tInitial telemetry: ");
+    Serial.println(telemtry);
 
     // Start the dma transfer interrupt
     // alarm_irq_send_dma_frame();
@@ -157,6 +202,7 @@ uint32_t temp_dma_buffer[dma_buffer_length] = {0};
     // TODO: Check if command length can be shortened by skipping
 */
 constexpr uint16_t ARM_THROTTLE = 300; // Max is 2000 (or 1999?)
+constexpr uint16_t MAX_THROTTLE = 2000;
 constexpr uint16_t THROTTLE_ZERO = 48; // 0 Throttle code
 uint16_t arm_sequence(const uint16_t idx)
 {
@@ -197,16 +243,20 @@ uint16_t telemtry = 0;
 // Helper function to send code to DMA buffer
 uint16_t writes_to_temp_dma_buffer = 0;
 uint16_t writes_to_dma_buffer = 0;
-void send_dshot_frame()
+void send_dshot_frame(bool debug)
 {
     // Stop timer interrupt JIC
     // irq_set_enabled(DMA_ALARM_IRQ, false);
 
+    if (debug)
+    {
+        Serial.print(throttle_code);
+        Serial.print("\t");
+    }
+
     // IF DMA is busy, then write to temp_dma_buffer
     // AND wait for DMA buffer to finish transfer
     // Then copy the temp buffer to dma buffer
-    Serial.print(throttle_code);
-    Serial.print("\t");
     if (dma_channel_is_busy(dma_chan))
     {
         DShot::command_to_pwm_buffer(throttle_code, telemtry, temp_dma_buffer, DSHOT_LOW, DSHOT_HIGH, pwm_channel);
@@ -240,6 +290,7 @@ void send_dshot_frame()
 // Helper function to arm motor
 void arm_motor()
 {
+
     // Debugging
     writes_to_temp_dma_buffer = 0;
     writes_to_dma_buffer = 0;
@@ -346,7 +397,15 @@ void loop()
         // a (arm)
         if (incomingByte == 97)
         {
+            // Disable timer
+            cancel_repeating_timer(&send_frame_rt);
+            // Arm motor
             arm_motor();
+            // Re-enable timer
+            dma_alarm_rt_state = alarm_pool_add_repeating_timer_us(pico_alarm_pool, DMA_ALARM_PERIOD, repeating_send_dshot_frame, NULL, &send_frame_rt);
+            Serial.print("Re-enabled repeating DMA alarm: ");
+            Serial.println(dma_alarm_rt_state);
+
             return;
         }
 
@@ -357,11 +416,62 @@ void loop()
             telemtry = 1;
         }
 
-        // r - ramp
-        if (incomingByte == 114)
+        // s - spin
+        if (incomingByte == 115)
         {
+            // Disable timer
+            cancel_repeating_timer(&send_frame_rt);
             // Ramp up to speed ARM_THROTTLE + 100
             ramp_motor();
+            // Re-enable timer
+            dma_alarm_rt_state = alarm_pool_add_repeating_timer_us(pico_alarm_pool, DMA_ALARM_PERIOD, repeating_send_dshot_frame, NULL, &send_frame_rt);
+            Serial.print("Re-enabled repeating DMA alarm: ");
+            Serial.println(dma_alarm_rt_state);
+        }
+
+        // r - rise
+        if (incomingByte == 114)
+        {
+            if (throttle_code >= THROTTLE_ZERO and throttle_code <= MAX_THROTTLE)
+            {
+                // Check for max throttle
+                if (throttle_code == MAX_THROTTLE)
+                {
+                    Serial.println("Max Throttle reached");
+                }
+                else
+                {
+                    throttle_code += 1;
+                    Serial.print("Throttle: ");
+                    Serial.println(throttle_code);
+                }
+            }
+            else
+            {
+                Serial.println("Motor is not in throttle mode");
+            }
+        }
+
+        // f - fall
+        if (incomingByte == 102)
+        {
+            if (throttle_code <= MAX_THROTTLE && throttle_code >= THROTTLE_ZERO)
+            {
+                if (throttle_code == THROTTLE_ZERO)
+                {
+                    Serial.println("Throttle is zero");
+                }
+                else
+                {
+                    throttle_code -= 1;
+                    Serial.print("Throttle: ");
+                    Serial.println(throttle_code);
+                }
+            }
+            else
+            {
+                Serial.println("Motor is not in throttle mode");
+            }
         }
 
         // spacebar = 0 throttle --> This could be disarm.

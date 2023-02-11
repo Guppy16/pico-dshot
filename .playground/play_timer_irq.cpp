@@ -7,7 +7,7 @@
 #include "hardware/timer.h"
 #include "hardware/irq.h"
 
-#define PICO_TIME_DEFAULT_ALARM_POOL_DISABLED 1
+// #define PICO_TIME_DEFAULT_ALARM_POOL_DISABLED 1
 
 // NOTE: How do we know using alarm 1
 // will not affect other programs?
