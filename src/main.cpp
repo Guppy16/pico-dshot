@@ -239,30 +239,30 @@ void send_dshot_frame()
 // Helper function to arm motor
 void arm_motor()
 {
-    uint16_t arm_idx = 0 - 1;
-    telemtry = 0;
 
     // Debugging
     writes_to_temp_dma_buffer = 0;
     writes_to_dma_buffer = 0;
 
-    uint64_t duration; // milli seconds
+    uint64_t duration;    // milli seconds
     uint64_t target_time; // micro seconds
-    uint n = 101 - 1; // Num of commands to send on rise and fall
+    uint n = 101 - 1;     // Num of commands to send on rise and fall
 
     // Send 0 command for 200 ms
     throttle_code = THROTTLE_ZERO;
     telemtry = 0;
-    duration = 200; //ms
+    duration = 200; // ms
     target_time = timer_hw->timerawl + duration * 1000;
     // TODO: re implement as a timer interrupt
-    while (timer_hw->timerawl < target_time) send_dshot_frame();
+    while (timer_hw->timerawl < target_time)
+        send_dshot_frame();
 
     // Increase throttle from 0 from to ARM_THROTTLE for 100 steps
     // < 20 ms time for Dshot 150, 20 bit frame length, n = 100
     n = 100;
     telemtry = 0;
-    for (uint16_t i = 0; i <= n; ++i){
+    for (uint16_t i = 0; i <= n; ++i)
+    {
         throttle_code = THROTTLE_ZERO + i * (ARM_THROTTLE - THROTTLE_ZERO) / n;
         send_dshot_frame();
     }
@@ -270,16 +270,18 @@ void arm_motor()
     // Send ARM_THROTTLE command for 300 ms
     throttle_code = ARM_THROTTLE;
     telemtry = 0;
-    duration = 300; //ms
+    duration = 300; // ms
     target_time = timer_hw->timerawl + duration * 1000;
     // TODO: re implement as a timer interrupt
-    while (timer_hw->timerawl < target_time) send_dshot_frame();
+    while (timer_hw->timerawl < target_time)
+        send_dshot_frame();
 
     // Decrease throttle to 48
     // < 20 ms time for Dshot 150, 20 bit frame length, n = 100
     n = 100;
     telemtry = 0;
-    for (uint16_t i = n; i < n; --i){
+    for (uint16_t i = n; i < n; --i)
+    {
         throttle_code = THROTTLE_ZERO + i * (ARM_THROTTLE - THROTTLE_ZERO) / n;
         send_dshot_frame();
     }
@@ -287,33 +289,13 @@ void arm_motor()
     // Send THROTTLE_ZERO for 500 ms
     throttle_code = THROTTLE_ZERO;
     telemtry = 0;
-    duration = 500; //ms
+    duration = 500; // ms
     target_time = timer_hw->timerawl + duration * 1000;
     // TODO: re implement as a timer interrupt
-    while (timer_hw->timerawl < target_time) send_dshot_frame();
-
-    // while (throttle_code != 0)
-    // {
-    //     send_dshot_frame();
-    //     throttle_code = arm_sequence(arm_idx);
-    //     ++arm_idx;
-    // }
-
-    // Do nothing for some time
-    // delay(2000);
-
-    // do
-    // {
-    //     send_dshot_frame();
-    //     ++arm_idx;
-    //     throttle_code = arm_sequence(arm_idx);
-    // } while (throttle_code != 0);
-
-    // throttle_code = 48;
+    while (timer_hw->timerawl < target_time)
+        send_dshot_frame();
 
     Serial.println();
-    Serial.print("Arm idx: ");
-    Serial.println(arm_idx);
     Serial.print("Writes to temp dma buffer: ");
     Serial.println(writes_to_temp_dma_buffer);
     Serial.print("Writes to dma buffer: ");
@@ -351,10 +333,9 @@ void loop()
         if (incomingByte == 115)
         {
             // Ramp up to speed = 400
-
         }
 
-        // spacebar = 0 throttle --> This could be disarm. 
+        // spacebar = 0 throttle --> This could be disarm.
         // Not sure how to disarm yet. Maybe set throttle to 0 and don't send a cmd for some secs?
         if (incomingByte == 32)
         {
