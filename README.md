@@ -75,7 +75,9 @@ NOTE: 32 bit time is used
 - [ ] Transfer DMA setup to `tts/`
 - [ ] Transfer repeating timer to `tts/`
 - [ ] Transfer print config to logging / utils? Maybe check `refactor` branch
-- [ ] 
+- [ ] Rename `config.h` to `dshot_config.h`. Wrap variables in a namespace and remove prefix `DSHOT_`.
+- [ ] `tts.h` can be renamed `dshot_hw.h`?
+- [ ] Transfer dma frame sending to `shoot.h`
 
 ## Backlog
 - [ ] attempt proper arm sequence
