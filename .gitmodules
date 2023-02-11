@@ -1,3 +1,6 @@
 [submodule "lib/extern/pico-sdk"]
 	path = lib/extern/pico-sdk
 	url = https://github.com/raspberrypi/pico-sdk.git
+[submodule "lib/extern/Unity"]
+	path = lib/extern/Unity
+	url = https://github.com/ThrowTheSwitch/Unity.git
