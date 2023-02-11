@@ -10,6 +10,17 @@ uint16_t shoot::telemetry = 0;
 uint16_t shoot::writes_to_dma_buffer = 0;
 uint16_t shoot::writes_to_temp_dma_buffer = 0;
 
+alarm_pool_t *shoot::pico_alarm_pool = alarm_pool_create(DMA_ALARM_NUM, PICO_TIME_DEFAULT_ALARM_POOL_MAX_TIMERS);
+bool shoot::dma_alarm_rt_state = false;
+struct repeating_timer shoot::send_frame_rt;
+
+void shoot::rt_setup()
+{
+    shoot::dma_alarm_rt_state = alarm_pool_add_repeating_timer_us(shoot::pico_alarm_pool, DMA_ALARM_PERIOD, shoot::repeating_send_dshot_frame, NULL, &shoot::send_frame_rt);
+
+    Serial.print("\nDMA Repeating Timer Setup: ");
+    Serial.print(shoot::dma_alarm_rt_state);
+}
 
 void shoot::send_dshot_frame(bool debug)
 {
@@ -56,4 +67,13 @@ void shoot::send_dshot_frame(bool debug)
     // so, be careful if delay is more than that
     // uint64_t target = timer_hw->timerawl + DMA_ALARM_PERIOD;
     // timer_hw->alarm[DMA_ALARM_NUM] = (uint32_t)target;
+}
+
+bool shoot::repeating_send_dshot_frame(struct repeating_timer *rt)
+{
+    // Send DShot frame
+    shoot::send_dshot_frame(false);
+    // CAN DO: Use rt-> for debug
+    // Return true so that timer repeats
+    return true;
 }
