@@ -31,6 +31,37 @@ NOTE: need a good source for this.
 48 - 2047: Throttle (2000 steps of precision)
 
 ---
+## Scheme
+
+The ESC needs commands to be sent within a set interval (currently undetermined). In order to satisfy this, the code is modelled as follows:
+
+NOTE: Timer interrupt should be longer than the time taken to send a command from the buffer using DMA. This is so that there is enough time for the Main loop to send the next command before the interrupt is raised!
+
+Timer raises interrupt at set-interval rate
+    This will restart DMA (i.e. re-send last known command)
+    OR a safety measure can be done to check if the system is responding, else send a disarm cmd / NOT send a cmd so that ESC disarms by itself
+
+Main loop:
+    Calculate next command to send
+    Reset Timer interrupt
+    Wait for current command to finish
+    Send command
+
+Debugging:
+    Measure how many times interrupt is called
+    Measure how long each main loop takes
+    Measure minimum time before motor sends command
+
+Additions:
+    Look at using a two buffers. One to store the current command being executed. The second one should store the next command to write. The idea is that this elimantes the  overhead in copying from the temporary buffer to the main buffer; instead, we are swapping the reference to the buffer where DMA gets data from. however, this complicated things due to having to keep track of which buffer is which..
+
+NOTE: 32 bit time is used
+- `timer_hw->timerawl` returns a 32 bit number representing the number of microseconds since power on
+- This will overflow at around 72 hrs
+- We assume that this is longer than the operation time before the microcontroller is restarted
+- NOTE that this has been the cause of many accidental failures in the past..
+
+---
 ## Functions
 
 - :tick: calculating duty cycle of bits from dshot speed
@@ -40,6 +71,9 @@ NOTE: need a good source for this.
 
 - Write some tests for these function!
 
+NOTE:
+- When re-setting DMA configuration, I tried just resetting the read address (assuming that the remaining configuration would stay the same). This did not work; one must re-configure the channel on every transfer. This seems inefficient.
+
 ---
 ## Test Data
 
@@ -47,3 +81,4 @@ Command: 1, Tel: 1
 0x0033
 Transmitted from left to right (I think)
 LLLL LLLL LLHH LLHH
+
