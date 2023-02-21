@@ -1,0 +1,6 @@
+.pio
+.vscode/
+.archive/
+.playground/
+desktop.ini
+build/
