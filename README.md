@@ -1,21 +1,23 @@
 # Pico DShot
+
 This repo is being developed to use a RPi Pico to send dshot commands to ESCs.
 This is a work in progress.
-
 
 ## Setting up the repo
 
-- git clone repo
-- git submodule init
-- git submodule update
-- `cd lib/extern/pico-sdk; git submodule update --init` <-- This was required for `TinyUSB`
-This repo is being developed to use a RPi Pico to send dshot commands to ESCs.
-This is a work in progress.
+```
+git clone git@github.com:Guppy16/pico-dshot.git
+git submodule update --init
+cd lib/extern/pico-sdk
+git submodule update --init lib/tinyusb
+```
+
+Note that `TinyUSB` is required to use the uart 
 
 ## Running the Unit Tests
 
-We use [Unity Test](https://github.com/ThrowTheSwitch/Unity) as the framework for our tests. The CMake file was inspired from the [Rainer Poisel](https://www.poisel.info/posts/2019-07-15-cmake-unity-integration/), [Throw The Switch](http://www.throwtheswitch.org/build/cmake) and [Testing with CMake and CTest](https://cmake.org/cmake/help/book/mastering-cmake/chapter/Testing%20With%20CMake%20and%20CTest.html). 
-Assuming all the submodules have been setup
+We use [Unity Test](https://github.com/ThrowTheSwitch/Unity) as the framework for our tests. 
+Assuming all the submodules have been setup:
 
 ```terminal
 mkdir test/build && cd $_
@@ -23,6 +25,13 @@ cmake ..
 cmake --build .
 ctest --verbose
 ```
+
+---
+## Example
+
+This repo is being used as submodule for [pico-tts](https://github.com/Guppy16/pico-tts)
+
+TODO: include some examples of how to use this repo
 
 ---
 ## Code Overview
@@ -71,10 +80,7 @@ Dependency Graph:
 - [ ] Try: `DSHOT_SPEED = DEBUG ? 0.008 : 1200 // kHz` (this may get rid of some other ternaries on DEBUG)
 - [ ] Add validation to ensure PWM, DMA, repeating timer have been setup correctly. MCU_CLK could take in a measured reading. Use `lib/extern/pico-sdk/src/rp2_common/hardware_clocks/scripts/vcocalc.py` to find valid sys clock frequencies.
 - [ ] Currently dma writes to a PWM counter compare. This actually writes to two dma channels (because upper / lower 16 bits are separate counters). Hence we render one dma channel useless. Is it possible to implement this in a better way?
-- [ ] Do we need to use the Arduino framework? Or can we just use the Pico SDK and import libraries 3rd party libs if necessary? If the latter, we could either consider [Wiz IO](https://github.com/Wiz-IO/wizio-pico) or check out [this post](https://community.platformio.org/t/include-pico-stdlib-h-causes-errors/22997). 
-- [ ] Transfer `print_*_setup` functions to logging / utils? Maybe check `refactor` branch. Maybe include the serial printf lib. There is an interesting post on [printable classes](https://forum.arduino.cc/t/printable-classes/438816)
-- [ ] Scheme to represent DShot codes. enum is possible for special codes, but shouldn't be used for throttle values?
-- [ ] Explore the idea of using / generating a look up table to convert dshot to pwm counter values (and vice versa for bidir dshot). 
+- [ ] Scheme to represent DShot codes. enum is possible for special codes, but shouldn't be used for throttle values? Explore the idea of using / generating a look up table to convert dshot to pwm counter values (and vice versa for bidir dshot). 
 Can this be hooked up with Programmable IO?
 Memory usage: 2^16 command x 32 bit word = 32k x 64 bit word (that might be too much). 
 - [ ] I believe that the uart and serial are initialised in `stdio_init_all()` (called in `main.cpp`). Perhaps we should use `stdio_usb_init()` and `stdio_uart_init()` separately. For telemetry (not yet committed), Peter used `stdio_uart_init()` after `stdio_init_all()` and didn't have errors.
@@ -124,26 +130,6 @@ For example, to make the motors beep the DShot frame is constructed as follows:
 It takes some time to calculate and send a dshot frame. To mitigate the effect of calculation, the implementation can use two buffers to store the DMA frame: a main buffer to store the current frame being sent by DMA, and a second buffer to store the next frame. This second buffer is only used if DMA is still sending the current frame, otherwise we default to storing the next frame in the main buffer. Further optimisation can be done by checking if the current dshot code and telem are the same as the next one, in which case there is no need to recalculate the frame. 
 
 ---
-## Thrust Test Stand
-
-Aim: Gather data on motor performance
-
-- linear ramp test (how long do we ramp for?)
-- step response
-- code a pid loop, and see it's effect on motor performance
-
-- Interestingly, since the number of dshot values is discretised, 
-it might be possible to create a table characterising the response 
-from one throttle value to another!?
-
-- In `send_dshot_frame()`, there could be a safety measure to see if the motors are responding, and only then send a command. If not, don't send a command, and the ESC will disarm itself. 
-
-Possible pico telemetry:
-- Count number of dshot frames sent
-- Measure how long each main loop takes
-- Measure min and max dshot update freq
-
----
 ## Sources
 
 ### USB Driver
@@ -157,6 +143,8 @@ Possible pico telemetry:
 - [PlatformIO Documentation on Pico](https://docs.platformio.org/en/stable/boards/raspberrypi/pico.html#board-raspberrypi-pico). It only mentions the Arduino framework, but more seem to be avaialable (see other links here). 
 - [Unity Assertion Reference](https://github.com/ThrowTheSwitch/Unity/blob/master/docs/UnityAssertionsReference.md) is a useful guide handbook for unit testing with Unity framework. 
 - [Unit testing on Embedded Target using PlatformIO](https://piolabs.com/blog/insights/unit-testing-part-2.html)
+
+- CMake file for Unity Testing was inspired from [Rainer Poisel](https://www.poisel.info/posts/2019-07-15-cmake-unity-integration/), [Throw The Switch](http://www.throwtheswitch.org/build/cmake) and [Testing with CMake and CTest](https://cmake.org/cmake/help/book/mastering-cmake/chapter/Testing%20With%20CMake%20and%20CTest.html). 
 
 ### Explanations of DShot
 
