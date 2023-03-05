@@ -20,7 +20,7 @@ add_compile_options(
 pico_sdk_init()
 
 set(DSHOT_FILES ./lib/shoot/shoot.cpp ./lib/tts/tts.cpp ./lib/utils/utils.cpp
-                ./lib/dshot/dshot.cpp)
+                )
 
 add_executable(${PROJECT_NAME}
     src/main.cpp
@@ -46,3 +46,4 @@ target_link_libraries(
 pico_add_extra_outputs(${PROJECT_NAME})
 pico_enable_stdio_usb(${PROJECT_NAME} 1)
 pico_enable_stdio_uart(${PROJECT_NAME} 0)
+

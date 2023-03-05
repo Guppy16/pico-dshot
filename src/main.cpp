@@ -19,6 +19,11 @@ bool update_signal(const int &key_input) {
     shoot::telemetry = 1;
   }
 
+  // d - debug
+  if (key_input == 100) {
+    printf("Writes to primary buffer: %li\tsecondary buffer: %li\n", shoot::writes_to_dma_buffer, shoot::writes_to_temp_dma_buffer);
+  }
+
   // r - rise
   if (key_input == 114) {
     if (shoot::throttle_code >= ZERO_THROTTLE and
@@ -68,7 +73,7 @@ int main() {
   // Set MCU clock frequency. Should we assert this?
   set_sys_clock_khz(MCU_FREQ * 1e3, false);
 
-  int key_input;
+  int key_input = 0;
 
   stdio_init_all();
   gpio_init(LED_BUILTIN);
