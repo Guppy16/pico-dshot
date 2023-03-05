@@ -70,7 +70,7 @@ void tts::print_dma_setup() {
   printf("\nDMA Setup\n");
 
   printf("Channel: %i", tts::dma_channel);
-  printf("\tBuffer Length: %i", DSHOT_FRAME_LENGTH);
+  printf("\tBuffer Length: %i", DSHOT_PACKET_LENGTH);
 
   // printf("Repeating Timer Setup: ");
   // printf("Not implemented");

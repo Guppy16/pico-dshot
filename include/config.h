@@ -1,8 +1,11 @@
-/*
- * File to store main constants
- */
 #pragma once
 #include "stdint.h"
+
+/** @file config.h
+ *  @defgroup dshot_config dshot_config
+ * 
+ * Define constants used to setup dshot on a Rpi Pico
+ */
 
 // NOTE: The equivalent DSHOT speed is 8 Hz in DEBUG mode
 // This could be set here directly instead of changing:
@@ -52,11 +55,11 @@ constexpr uint16_t DSHOT_LOW = 0.37 * DSHOT_PWM_WRAP;
 // Number of counts to represent a digital high
 constexpr uint16_t DSHOT_HIGH = 0.75 * DSHOT_PWM_WRAP;
 
-// DShot cmd size is defined to be 16
-constexpr uint32_t DSHOT_CMD_SIZE = 16;
+// DShot frame size is defined to be 16
+constexpr uint32_t DSHOT_FRAME_LENGTH = 16;
 
-// Frame = DShot command + 0 padding
-constexpr unsigned int DSHOT_FRAME_LENGTH = DSHOT_CMD_SIZE + 4;
+// packet = dshot frame | frame reset(= 0 padding)
+constexpr unsigned int DSHOT_PACKET_LENGTH = DSHOT_FRAME_LENGTH + 4;
 
 /*! \brief Maximum time between DShot commands in micro secs
  *  \ingroup config
@@ -65,7 +68,7 @@ constexpr unsigned int DSHOT_FRAME_LENGTH = DSHOT_CMD_SIZE + 4;
  *  20 bits / 150 kHz = 2/15 ms > 133 us
  *  Hence we can use a minimum of 7 kHz update rate
  *
- *  TODO: Assert DSHOT_CMD_SIZE / DSHOT_SPEED (MHz) < DMA_ALARM_PERIOD
+ *  TODO: Assert DSHOT_FRAME_LENGTH / DSHOT_SPEED (MHz) < DMA_ALARM_PERIOD
  *  NOTE: DEBUG sets this to 3 s, because the time for each command is:
  *  20 / 8 = 2.5 s (NOTE the effective dshot speed is 8 Hz)
  */

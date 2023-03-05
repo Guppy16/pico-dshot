@@ -93,47 +93,86 @@ DShot is a digital protocol which typically sends commands using PWM hardware (n
 DShot is has discretised resolution, where as PWM was analogue on FC side (albeit discretised on the ESC due to hw limitations), 
 however the advantages in accuracy, precision, resolution and communication outweigh this.
 
-A Dshot *command* is constructed as follows:
-- 11 bit number representing the *code* (0 to 2047)
-- 1 bit telemetry flag
-- 4 bit CRC
+A Dshot *frame* is constructed as follows:
+- 11 bit number representing the *value* (0 to 2047)
+- 1 bit *telemetry* flag
+- 4 bit *checksum* (CRC)
 
-To transmit this *command* we construct a *frame* by converting the bits to a voltage signal. Each bit is represented as a duty cycle on pwm hw
-- 0 = \< 33%
-- 1 = > 75%
-- Note that a prefix and suffix 0 duty cycle (not a 0 bit!) is required in transmission to tell each frame apart
+| Dshot *Value* | Meaning                                |
+| ------------- | -------------------------------------- |
+| 0             | Disarm, but hasn't been implemented    |
+| 1 - 47        | Reserved for special use               |
+| 48 - 2047     | Throttle position (resolution of 2000) |
 
-The period of each bit (i.e. the period set in the PWM hw) is determined by by the DShot freq.
-i.e. DShot150 sets the PWM hw freq to 150 kHz
+A bit is converted to a *duty cycle*, which is transmit as a "pulse" using PWM hw. 
 
-Dshot *Codes*:
-0 - Disarm (though not implemented?)
-1 - 47: reserved for special use
-48 - 2047: Throttle (2000 steps of precision)
+| bit | duty cycle |
+| --- | ---------- |
+| 0   | \< 33%     |
+| 1   | >75%       |
 
-For example, to make the motors beep the DShot frame is constructed as follows:
+The *period* of each pulse (or bit) is set by the Dshot freqeuncy (e.g. Dshot150 corresponds to 150 kHz). 
 
-`Code = 1`, `Telemetry = 1`
+To indicate a frame reset, a pause of at least $2 \mu$s is required (source [Betaflight wiki](https://betaflight.com/docs/development/Dshot)). This pause should have a duty cycle of 0. 
+This pause can be converted to bits as follows:
+
+$$
+\text{Pause bits} = \lceil \frac{2 \mu \text{s}}{\text{Pulse Period}} \rceil
+$$
+
+
+| Dshot freq / kHz | pulse period / $\mu$s | Pause bits |
+| ---------------- | --------------------- | ---------- |
+| 150              | 6.67                  | 1          |
+| 600              | 1.67                  | 2          |
+| 1200             | 0.833                 | 3          |
+
+Our implementation uses a constant value of 4 bits as a pause between frames (i.e. we assume a max Dshot freq of 2000). 
+Hence, the PWM hw is sent a *packet* of 20 duty cycles (16 for a DShot frame and 4 for a frame reset).
+
+### Example
+
+To make the motors beep a DShot packet is constructed as follows:
+
+The Dshot *command* is: `Value = 1`, `Telemetry = 1`
 
 → First 12 bits of the command `0x003`
 
 → `CRC = 0 XOR 0 XOR 3 = 3`
 
-→ `Command = 0x0033`
+→ `Frame = 0x0033`
 
-→ Transmitted from left to right, the frame is: `LLLL LLLL LLHH LLHH`
+→ `Packet = LLLL LLLL LLHH LLHH 0000`
 
-(Please note that this nomenclature is not standard, but I believe it is clear)
+The packet is transmit from left to right (i.e. big endian). 
+
+(Please note that most of this nomenclature is taken from the [betaflight wiki](https://betaflight.com/docs/development/Dshot), but some of it may not be standard)
 
 ### Interesting Aside
 
-It takes some time to calculate and send a dshot frame. To mitigate the effect of calculation, the implementation can use two buffers to store the DMA frame: a main buffer to store the current frame being sent by DMA, and a second buffer to store the next frame. This second buffer is only used if DMA is still sending the current frame, otherwise we default to storing the next frame in the main buffer. Further optimisation can be done by checking if the current dshot code and telem are the same as the next one, in which case there is no need to recalculate the frame. 
+It takes some time to calculate a packet, before sending it to the DMA hw. 
+We pipeline this by using two buffers:
+- a primary buffer stores the current frame being sent by DMA
+- a second buffer to store the next frame
+
+```c
+if (dma_channel_is_busy){
+  secondary_buffer = dshot_cmd_to_packet();
+  dma_channel_wait_for_finish_blocking();
+}else{
+  primary_buffer = dshot_cmd_to_packet();
+}
+```
+
+Initial profiling showed that both buffers are used, 
+however our codebase has changed a lot since then..
+
+Also, note that `dma_channel_wait_for_finish_blocking()` could be "risky" because this is executed as an interrupt service routine, which expects the routine to finish within a certain amount of time. 
+
+Further optimisation can be done by checking if the current dshot code and telem are the same as the next one, in which case there is no need to recalculate the frame. 
 
 ---
 ## Sources
-
-### USB Driver
-- Use [Zadig](https://zadig.akeo.ie/) to install drivers for the RPi boot interface. This makes the flashing experience a LOT better! A thread on the [platform io forum](https://community.platformio.org/t/official-platformio-arduino-ide-support-for-the-raspberry-pi-pico-is-now-available/20792/9) goes in to more detail. [This thread[(https://community.platformio.org/t/raspberry-pi-pico-upload-problem/22809/7) also linked to this [github comment](https://github.com/platformio/platform-raspberrypi/issues/2#issuecomment-828586398) mentions to use Zadig. 
 
 ### Docs and Sample Implementation
 - [Pico SDK API Docs](https://raspberrypi.github.io/pico-sdk-doxygen/modules.html). Some quick links: [dma](https://raspberrypi.github.io/pico-sdk-doxygen/group__hardware__dma)
@@ -148,7 +187,7 @@ It takes some time to calculate and send a dshot frame. To mitigate the effect o
 
 ### Explanations of DShot
 
-- [Betaflight DShot Wiki](https://github.com/betaflight/betaflight/wiki/DSHOT-ESC-Protocol)
+- [Betaflight DShot Wiki](https://betaflight.com/docs/development/Dshot)
 - [Spencer's HW Blog](https://www.swallenhardware.io/battlebots/2019/4/20/a-developers-guide-to-dshot-escs) has a quick overview on the DShot protocol, list of the dshot command codes (which shd be sourced somewhere in the [betaflight repo](https://github.com/betaflight/betaflight)), and implmenetation overviews using scp and dma. 
 - [This post](https://blck.mn/2016/11/dshot-the-new-kid-on-the-block/) has a simple explanation of dshot with a few examples
 - [DShot - the missing handbook](https://brushlesswhoop.com/dshot-and-bidirectional-dshot/) has supported hw, dshot frame example, arming, telemetry, bi-directional dshot
@@ -158,6 +197,8 @@ It takes some time to calculate and send a dshot frame. To mitigate the effect o
 - [SiieeFPV](https://www.youtube.com/watch?v=fNLxHWd0Bvg) has a YT vid explaining DMA implementation on a *Kinetis K66*. This vid was a useful in understanding what was needed for our implementation. 
 
 ### Other
+
+- Use [Zadig](https://zadig.akeo.ie/) to install drivers for the RPi boot interface on Windows. This makes the flashing experience a LOT better! This has been mentioned in platform io and github forums (in depth [here](https://community.platformio.org/t/official-platformio-arduino-ide-support-for-the-raspberry-pi-pico-is-now-available/20792/9), briefly [here](https://community.platformio.org/t/raspberry-pi-pico-upload-problem/22809/7), which links to [this](https://github.com/platformio/platform-raspberrypi/issues/2#issuecomment-828586398)).
 
 - [Wiz IO Pico](https://github.com/Wiz-IO/wizio-pico): seems like an alternative to the Arduino framework used in PlatformIO? More details can be found on their [Baremetal wiki](https://github.com/Wiz-IO/wizio-pico/wiki/BAREMETAL)
 - [Rpi Pico Forum post](https://forums.raspberrypi.com/viewtopic.php?t=332483). This person has balls to try and implemenet dshot using assembly!!

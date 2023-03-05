@@ -15,8 +15,8 @@
 namespace shoot
 {
   // TODO: Does this ever need to be volatile?
-  extern uint32_t dma_buffer[DSHOT_FRAME_LENGTH];
-  extern uint32_t temp_dma_buffer[DSHOT_FRAME_LENGTH];
+  extern uint32_t dma_buffer[DSHOT_PACKET_LENGTH];
+  extern uint32_t temp_dma_buffer[DSHOT_PACKET_LENGTH];
   const dshot_packet_config pwm_packet_conf = {
       .dshot_high = DSHOT_HIGH,
       .dshot_low = DSHOT_LOW,

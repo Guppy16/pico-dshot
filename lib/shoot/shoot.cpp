@@ -2,8 +2,8 @@
 
 // #include "dshot.h"
 
-uint32_t shoot::dma_buffer[DSHOT_FRAME_LENGTH] = {0};
-uint32_t shoot::temp_dma_buffer[DSHOT_FRAME_LENGTH] = {0};
+uint32_t shoot::dma_buffer[DSHOT_PACKET_LENGTH] = {0};
+uint32_t shoot::temp_dma_buffer[DSHOT_PACKET_LENGTH] = {0};
 
 uint16_t shoot::throttle_code = 0;
 uint16_t shoot::telemetry = 0;
@@ -55,7 +55,7 @@ void shoot::send_dshot_frame(bool debug)
     //                              DSHOT_HIGH, tts::pwm_channel);
     dma_channel_wait_for_finish_blocking(tts::dma_channel);
     memcpy(shoot::dma_buffer, shoot::temp_dma_buffer,
-           DSHOT_FRAME_LENGTH * sizeof(uint32_t));
+           DSHOT_PACKET_LENGTH * sizeof(uint32_t));
     ++shoot::writes_to_temp_dma_buffer;
   }
   // ELSE write to dma_buffer directly
@@ -73,7 +73,7 @@ void shoot::send_dshot_frame(bool debug)
   dma_channel_configure(
       tts::dma_channel, &tts::dma_config,
       &pwm_hw->slice[tts::pwm_slice_num].cc, // Write to PWM counter compare
-      shoot::dma_buffer, DSHOT_FRAME_LENGTH, true);
+      shoot::dma_buffer, DSHOT_PACKET_LENGTH, true);
 
   // Restart interrupt
   // irq_set_enabled(DMA_ALARM_IRQ, true);
