@@ -1,7 +1,5 @@
 #include "shoot.h"
 
-// #include "dshot.h"
-
 uint32_t shoot::dma_buffer[DSHOT_PACKET_LENGTH] = {0};
 uint32_t shoot::temp_dma_buffer[DSHOT_PACKET_LENGTH] = {0};
 
@@ -50,9 +48,6 @@ void shoot::send_dshot_frame(bool debug)
     dshot_cmd_to_packet(
         shoot::throttle_code, shoot::telemetry,
         shoot::temp_dma_buffer, shoot::pwm_packet_conf);
-    // DShot::command_to_pwm_buffer(shoot::throttle_code, shoot::telemetry,
-    //                              shoot::temp_dma_buffer, DSHOT_LOW,
-    //                              DSHOT_HIGH, tts::pwm_channel);
     dma_channel_wait_for_finish_blocking(tts::dma_channel);
     memcpy(shoot::dma_buffer, shoot::temp_dma_buffer,
            DSHOT_PACKET_LENGTH * sizeof(uint32_t));
@@ -64,9 +59,6 @@ void shoot::send_dshot_frame(bool debug)
     dshot_cmd_to_packet(
         shoot::throttle_code, shoot::telemetry,
         shoot::dma_buffer, shoot::pwm_packet_conf);
-    // DShot::command_to_pwm_buffer(shoot::throttle_code, shoot::telemetry,
-    //                              shoot::dma_buffer, DSHOT_LOW, DSHOT_HIGH,
-    //                              tts::pwm_channel);
     ++shoot::writes_to_dma_buffer;
   }
   // Re-configure DMA and trigger transfer

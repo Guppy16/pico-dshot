@@ -1,3 +1,10 @@
+# Doxyfile
+
+# This file describes the settings to be used by the documentation system
+# doxygen (www.doxygen.org) for a project.
+# More configurations can be found in 
+# https://github.com/datastax/cpp-driver/blob/master/Doxyfile.in
+
 OUTPUT_DIRECTORY      = @CMAKE_CURRENT_BINARY_DIR@/doc_doxygen/
 INPUT                 = @CMAKE_CURRENT_SOURCE_DIR@/../src/ @CMAKE_CURRENT_SOURCE_DIR@/../include/ @CMAKE_CURRENT_SOURCE_DIR@/../lib/tts/ @CMAKE_CURRENT_SOURCE_DIR@/../lib/shoot/ 
 EXTRACT_ALL           = YES

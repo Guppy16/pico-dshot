@@ -2,6 +2,7 @@
 
 This repo is being developed to use a RPi Pico to send dshot commands to ESCs.
 This is a work in progress.
+This repo was developed to be used as submodule for [pico-tts](https://github.com/Guppy16/pico-tts), which is a project to measure drone motor KPIs using a pico. 
 
 ## Setting up the repo
 
@@ -12,7 +13,7 @@ cd lib/extern/pico-sdk
 git submodule update --init lib/tinyusb
 ```
 
-Note that `TinyUSB` is required to use the uart 
+Note that `TinyUSB` is required to use the uart on the pico for serial read and write.
 
 ## Running the Unit Tests
 
@@ -29,34 +30,43 @@ ctest --verbose
 ---
 ## Example
 
-This repo is being used as submodule for [pico-tts](https://github.com/Guppy16/pico-tts)
+An example is included in `example/`:
 
-TODO: include some examples of how to use this repo
+```terminal
+mkdir example/build && cd $_
+cmake ..
+cmake --build .
+```
+
+Connecte the ESC signal pin to GPIO 14, and ESC gnd to pico gnd. 
+Upload `dshot_example.uf2` to the pico, and open a serial connection to it. 
+The motor will automatically arm, and you will be able to enter commands.
+View the list of commands in `example/main.cpp`. 
 
 ---
 ## Code Overview
 
 ```
-|-- lib
-    |-- dshot
-    |-- config
-    |-- tts
-    |-- shoot
-    |-- utils
-|-- src
-    | -- main.cpp
-|-- test
-    | -- test_dshot.cpp
+|-- include/
+    |-- config.h
+    |-- packet.h
+|-- lib/
+    |-- tts/
+    |-- shoot/
+|-- example/
+    |-- main.cpp
+|-- test/
+    |-- test_packet.cpp
 ```
 
-- `lib/` contains the libraries used to implement dshot on the pico
-    - `dshot/` is a standalone module that is used to convert a dshot command to a frame that can be sent using pwm hardware
-    - `config/` a header file for dshot globals, which are used to configure the hardware in `tts/`
-    - `tts/` contains the hardware implementations for dma, pwm, alarm pool
-    - `shoot/` implements sending dshot commands using the pwm hw as well as a repeating timer. A future merge request will add telem over uart in this module
-    - `utils/` just an led flashing for debugging
-
-- `src/` contains `main.cpp` which uses serial input to send dshot commands
+- `include` header files to setup dshot variables and functions
+    - `config.h` configure dshot globals
+    - `packet.h` convert a dshot command to a packet
+- `lib/` contains the libraries used to implement dshot on the pico   
+    - `tts/` pico hw implementations for dma, pwm, alarm pool
+    - `shoot/` send a dshot packet repeatedly
+- `example/`
+  - `main.cpp` allows you to use serial input to send dshot commands
 - `test/` contains a unit test for `dshot/` as well as a cmake config file
 
 Dependency Graph:
@@ -65,15 +75,12 @@ Dependency Graph:
 |-- shoot
 |   |-- tts
 |   |   |-- config
-|   |-- dshot
-|-- utils
+|   |-- packet
 ```
 
 ## To Do
-- [ ] Convert `dshot/` module to just a header file using static inlines (make sure to check it works with the unit tests)
-- [ ] Move `config.h` to `tts/dshotglobals.h` . Wrap variables in a namespace and remove prefix `DSHOT_` (a bit difficult because dshot namespace already exists)
-- [ ] `tts.h` can be renamed `dshothw.h`?
-- [ ] Maybe change / clarify the use of *code* and *command*
+- [ ] This whole repo can be setup as header only: `./dshot/include/globals.h, hw.h`
+- [ ] The print statemtents could be placed in an implementation file: `./dshot/src/logging.cpp`
 
 ## Backlog
 - [ ] attempt proper arm sequence
