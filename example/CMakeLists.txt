@@ -28,6 +28,7 @@ add_subdirectory(../ dshot-pico)
 
 target_link_libraries(
   ${PROJECT_NAME}
+  pico_bootsel_via_double_reset
   pico_stdlib
   pico_platform
   hardware_clocks

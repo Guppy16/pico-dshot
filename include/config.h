@@ -12,7 +12,14 @@
 // DSHOT_PWM_WRAP, DSHOT_PWM_DIV, (DMA_ALARM_PERIOD)?
 #define DSHOT_SPEED 1200  // kHz
 
-#define MCU_FREQ 120     // MHz. Keep track of MCU_FREQ. This doesn't set it
+/**
+ * @brief Keep track of the pico clock frequency (MHz)
+ * 
+ * @attention
+ * This doesn't set the mcu clock. Do this using
+ * `hardware/clocks.h::set_sys_clock_khz(MCU_FREQ * 1e3, false);`
+ */
+#define MCU_FREQ 120
 #define DMA_ALARM_NUM 1  // HW alarm num for alarm pool
 
 #define DEBUG 0

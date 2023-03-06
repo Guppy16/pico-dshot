@@ -5,12 +5,41 @@
 #include "pico/platform.h"
 #include "pico/stdlib.h"
 #include "shoot.h"
-#include "utils.h"
 
+/**
+ * @brief Flash LED on and off `repeat` times with 1s delay
+ * Ideally this should be implemented with timers
+ * @param led_pin 
+ * @param repeat 
+ */
+void flash_led(const int &led_pin, uint repeat = 1) {
+  while (repeat--) {
+    gpio_put(led_pin, 1);
+    sleep_ms(1000);
+    gpio_put(led_pin, 0);
+    sleep_ms(1000);
+  }
+}
+
+/**
+ * @brief Read key input and execute command
+ * 
+ * @param key_input 
+ * @return true 
+ * @return false Not implemented
+ * 
+ * @attention 
+ * Key presses are stored in a buffer in the pico, 
+ * hence spamming a key will cause downstream keys 
+ * to be executed later than expected.
+ * This is especially noticeable when @ref DEBUG is set
+ */
 bool update_signal(const int &key_input) {
-  // l (led)
+  printf("Processing key input %i\n", key_input);
+
+  // l - led
   if (key_input == 108) {
-    utils::flash_led(LED_BUILTIN);
+    flash_led(LED_BUILTIN);
   }
 
   // b - beep
@@ -19,7 +48,7 @@ bool update_signal(const int &key_input) {
     shoot::telemetry = 1;
   }
 
-  // d - debug
+  // d - details
   if (key_input == 100) {
     printf("Writes to primary buffer: %li\tsecondary buffer: %li\n", shoot::writes_to_dma_buffer, shoot::writes_to_temp_dma_buffer);
   }
@@ -58,42 +87,33 @@ bool update_signal(const int &key_input) {
     shoot::telemetry = 0;
     printf("Throttle: %i\n", 0);
   }
-
-  // NOTE: In DEBUG mode, sending a DSHOT Frame takes a lot of time!
-  // So it may seem as if the PICO is unable to detect key presses
-  // while sending commands!
-  // But is this even needed?
-  shoot::send_dshot_frame();
-  printf("Finished processing key input %i\n", key_input);
+  
+  printf("Finished processing key input");
 
   return true;
 }
 
 int main() {
-  // Set MCU clock frequency. Should we assert this?
+
+  // Set MCU clock frequency
   set_sys_clock_khz(MCU_FREQ * 1e3, false);
 
-  int key_input = 0;
-
   stdio_init_all();
+
+  // Setup builtin led to check if pico is running
   gpio_init(LED_BUILTIN);
   gpio_set_dir(LED_BUILTIN, GPIO_OUT);
+  flash_led(LED_BUILTIN, 3);
 
-  // Flash LED on and off 3 times
-  utils::flash_led(LED_BUILTIN, 3);
-
-  // Setup DShot
-
-  // pwm config
-  // Note that PWM needs to be setup first,
-  // because the dma dreq requires tts::pwm_slice_num
+  // --- setup dshot configurations ---
+  // pwm is setup first
   tts::pwm_setup();
+  // dma is setup next, because dma dreq requires tts::pwm_slice_num
   tts::dma_setup();
-  // Set repeating timer
-  // NOTE: this can be put in main loop to start
-  // repeating timer on key press (e.g. a for arm)
+  // finally, repeating timer is setup to send the dshot frames repeatedly
   shoot::rt_setup();
 
+  // sleep a bit, so that computer serial can connect to pico
   sleep_ms(1500);
 
   printf("MCU Freq (kHz): Expected %d Actual %d\n", MCU_FREQ * 1000,
@@ -107,6 +127,7 @@ int main() {
   printf("Initial throttle: %i\n", shoot::throttle_code);
   printf("Initial telemetry: %i\n", shoot::telemetry);
 
+  int key_input = 0;
   while (1) {
     key_input = getchar_timeout_us(0);
     key_input != PICO_ERROR_TIMEOUT && update_signal(key_input);

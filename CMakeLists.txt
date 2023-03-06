@@ -10,13 +10,11 @@ pico_sdk_init()
 set(DSHOT_FILES 
   ./lib/shoot/shoot.cpp 
   ./lib/tts/tts.cpp 
-  ./lib/utils/utils.cpp
 )
 
 set(DSHOT_INCL
   ./lib/shoot
   ./lib/tts
-  ./lib/utils
   ./include
 )
 
