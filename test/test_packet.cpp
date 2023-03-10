@@ -1,5 +1,6 @@
 #include "unity.h"
 #include "packet.h"
+#include <stdio.h>
 
 void setUp(void)
 {
@@ -11,106 +12,146 @@ void tearDown(void)
   // clean stuff up here
 }
 
+/**
+ * @brief Test \a dshot_code_telemetry_to_cmd
+ *
+ * code = 1046 (0x416), telemetry = 0
+ * command = 0x416 x 2 + 0 = 0x82C
+ *
+ * code = 1046 (0x416), telemetry = 1
+ * command = 0x416 x 2 + 1 = 0x82D
+ */
 void test_dshot_code_telemtry_to_cmd(void)
 {
-  // Code: 1046 = 0b 0100 0001 0110
   uint16_t code = 1046;
   uint16_t telemetry, expected_cmd, actual_cmd;
 
   telemetry = 0;
-  expected_cmd = 0b100000101100;
+  expected_cmd = 0x82C;
   actual_cmd = dshot_code_telemtry_to_cmd(code, telemetry);
   TEST_ASSERT_EQUAL_MESSAGE(expected_cmd, actual_cmd, "Telemetry: 0");
 
   telemetry = 1;
-  expected_cmd = 0b100000101101;
+  expected_cmd = 0x82D;
   actual_cmd = dshot_code_telemtry_to_cmd(code, telemetry);
   TEST_ASSERT_EQUAL_MESSAGE(expected_cmd, actual_cmd, "Telemetry: 1");
 }
 
+/**
+ * @brief Test \a dshot_cmd_to_crc
+ *
+ * code = 1046 (0x416), telemetry = 0
+ * --> command = 0x82C
+ * --> crc = 0x6 = 0b0110
+ */
 void test_dshot_cmd_crc(void)
 {
-  // CRC for 1046 + 0 telemetry = 0110
-  // NOTE: 1046 = 0b10000010110
   uint16_t crc = dshot_cmd_crc(1046 << 1);
   TEST_ASSERT_EQUAL(0b0110, crc);
 }
 
+/**
+ * @brief Test \a dshot_cmd_to_frame
+ *
+ * code = 1046 (0x416), telemetry = 0
+ * --> command = 0x82C
+ * --> crc = 6
+ * frame = 0x82C6 = 0b1000001011000110
+ */
 void test_dshot_cmd_to_frame(void)
 {
-  // Command: 1046 + 0 telemetry
-  // CRC 0110
-  // frame: 1046 + 0 + 0110
   uint16_t frame = dshot_cmd_to_frame(1046 << 1);
   TEST_ASSERT_EQUAL(0b1000001011000110, frame);
 }
 
+/**
+ * @brief test @a dshot_frame_to_packet
+ *
+ * Test with these cases:
+ *    frame = 0, high = 75, low = 33
+ *    frame = 1, high = 75, low = 33
+ *    frame = 1, high = 75 << 16, low = 33 << 16
+ */
 void test_dshot_frame_to_packet(void)
 {
   // Frame is any 16 bit number
   uint16_t frame;
   uint32_t packet[16] = {0};
   uint32_t expected_packet[16];
+  const uint32_t dshot_frame_length = 16;
 
-  const dshot_packet_config conf_chn0 = {
-      .dshot_high = 75, .dshot_low = 33, .pwm_channel = 0};
+  // pwm channel = 0 (i.e. there is no bit shift in packet values)
+  uint32_t packet_high = 75;
+  uint32_t packet_low = 33;
 
-  // Test with frame = 0
+  // frame = 0
   frame = 0b0;
   for (int i = 0; i < 16; ++i)
   {
-    expected_packet[i] = conf_chn0.dshot_low;
+    expected_packet[i] = packet_low;
   }
-  dshot_frame_to_packet(frame, packet, conf_chn0);
+  dshot_frame_to_packet(frame, packet, packet_high, packet_low, dshot_frame_length);
   TEST_ASSERT_EQUAL_HEX32_ARRAY_MESSAGE(expected_packet, packet, 16, "frame = 0b0, Channel 0");
 
-  // Test with frame = 1
+  // frame = 1
   frame = 0b1;
   for (int i = 0; i < 16; ++i)
   {
-    expected_packet[i] = conf_chn0.dshot_low;
+    expected_packet[i] = packet_low;
   }
-  expected_packet[16 - 1] = conf_chn0.dshot_high;
-  dshot_frame_to_packet(frame, packet, conf_chn0);
+  expected_packet[16 - 1] = packet_high;
+  dshot_frame_to_packet(frame, packet, packet_high, packet_low, dshot_frame_length);
   TEST_ASSERT_EQUAL_HEX32_ARRAY_MESSAGE(expected_packet, packet, 16, "frame = 0b1, Channel 0");
 
-  // Test channel = 1, packet = 1
-  const dshot_packet_config conf_chn1 = {
-      .dshot_high = 75, .dshot_low = 33, .pwm_channel = 1};
+  // frame = 1, with bit shifted values for packet_high and packet_low
   frame = 0b1;
+
+  packet_high = 75 << 16;
+  packet_low = 33 << 16;
+
   for (int i = 0; i < 16; ++i)
   {
-    expected_packet[i] = conf_chn1.dshot_low;
+    expected_packet[i] = packet_low;
   }
-  expected_packet[16 - 1] = conf_chn1.dshot_high;
-  for (int i = 0; i < 16; ++i)
-  {
-    expected_packet[i] <<= 16;
-  }
-  dshot_frame_to_packet(frame, packet, conf_chn1);
+  expected_packet[16 - 1] = packet_high;
+  dshot_frame_to_packet(frame, packet, packet_high, packet_low, dshot_frame_length);
   TEST_ASSERT_EQUAL_HEX32_ARRAY_MESSAGE(expected_packet, packet, 16, "frame = 0b1, channel 1");
 }
 
-void test_dshot_cmd_to_packet(void)
+/**
+ * @brief test dshot_packet_compose
+ *
+ * Test parameters:
+ *    code = 1, telemetry = 1
+ *    --> expected frame = 0x0033
+ *    expected packet = LLLL LLLL LLHH LLHH 0000
+ */
+void test_dshot_packet_compose(void)
 {
-  uint16_t frame;
-  const dshot_packet_config conf = {
-      .dshot_high = 75, .dshot_low = 33, .pwm_channel = 0};
-  uint32_t buffer_size = 18;
-  uint32_t packet[buffer_size] = {0};
-  uint32_t expected_packet[buffer_size] = {0};
+  uint32_t packet_high = 75, packet_low = 33;
 
-  // code: 1, telemetry: 1
-  // Expected frame: 0x0033
+  dshot_packet_t dshot_pckt = {
+      .throttle_code = 1,
+      .telemetry = 1,
+      .packet_high = packet_high,
+      .packet_low = packet_low};
 
-  dshot_cmd_to_packet(1, 1, packet + 1, conf);
+  // Construct expected packet:
+  uint32_t expected_packet[] = {
+      // LLLL
+      packet_low, packet_low, packet_low, packet_low,
+      // LLLL
+      packet_low, packet_low, packet_low, packet_low,
+      // LLHH
+      packet_low, packet_low, packet_high, packet_high,
+      // LLHH
+      packet_low, packet_low, packet_high, packet_high,
+      // 0000
+      0, 0, 0, 0};
 
-  for (int i = 1; i < buffer_size - 1; ++i)
-  {
-    expected_packet[i] = conf.dshot_low;
-  }
-  expected_packet[15] = expected_packet[16] = expected_packet[12] = expected_packet[11] = conf.dshot_high;
-  TEST_ASSERT_EQUAL_HEX32_ARRAY_MESSAGE(expected_packet, packet, buffer_size, "Code = 1, Telemetry = 1, Channel 0, Array idx: 1");
+  dshot_packet_compose(dshot_pckt);
+
+  TEST_ASSERT_EQUAL_HEX32_ARRAY_MESSAGE(expected_packet, dshot_pckt.packet_buffer, dshot_packet_length, "Code = 1, Telemetry = 1, Channel 0, Array idx: 0");
 }
 
 int runUnityTests(void)
@@ -119,8 +160,8 @@ int runUnityTests(void)
   RUN_TEST(test_dshot_code_telemtry_to_cmd);
   RUN_TEST(test_dshot_cmd_crc);
   RUN_TEST(test_dshot_cmd_to_frame);
-  RUN_TEST(test_dshot_cmd_to_packet);
   RUN_TEST(test_dshot_frame_to_packet);
+  RUN_TEST(test_dshot_packet_compose);
   return UNITY_END();
 }
 

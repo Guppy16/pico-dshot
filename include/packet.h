@@ -26,22 +26,41 @@ extern "C"
    */
 
   const uint dshot_frame_size = 16;
+  const uint dshot_packet_length = 20;
 
   /**
-   * @brief config for dshot packet, specific to pico pwm hw
+   * @brief config used for composing dshot packet
    * @ingroup dshot_packet
-   *
-   * @param dshot_low duty cycle for a dshot low bit
-   * @param dshot_high duty cycle for a dshot high bit
-   * @param pwm_channel pico pwm channel.
-   * See `hardware/pwm.h::pwm_gpio_to_channel`
-   */
-  typedef struct dshot_packet_config
-  {
-    const uint16_t dshot_high;
-    const uint16_t dshot_low;
-    const uint pwm_channel;
-  } dshot_packet_config;
+   * 
+   * @param primary_packet_buffer
+   * ~~@param secondary_packet_buffer This is declared here, but is used in another file~~
+   * @param throttle_code dshot throttle code (11 bit)
+   * @param telemetry dshot telemetry flag (1 bit)
+   * @param packet_high duty cycle for a dshot high bit
+   * @param packet_low duty cycle for a dshot low bit
+   * ~~@param pwm_channel pico pwm channel for dshot packet transmission~~
+   * 
+   * @attention
+   * Normally, the packet_high or packet_low would be 16 bits, 
+   * because the pico timers are 16 bit. 
+   * However, the pico uses 32 bits to store the value of two timers,
+   * each half stores the timer for a different pwm "channel". 
+   * Hene the value of packet_high and packet_low should be initialised as follows:
+   * ```
+   *  packet_high = (uint32_t)(0.75 * pwm_wrap) << (16 * pwm_channel)
+   *  packet_low = (uint32_t)(0.37 * pwm_wrap) << (16 * pwm_channel)
+   * ```
+   * More details about this shift for pwm_channel can be found in pico hardware/pwm
+  */
+  typedef struct dshot_packet{
+    uint32_t volatile packet_buffer[dshot_packet_length] = {0};
+    // uint32_t volatile secondary_packet_buffer[dshot_packet_length] = {0};
+    uint16_t throttle_code = 0;
+    uint16_t telemetry = 0;
+    const uint32_t packet_high;
+    const uint32_t packet_low;
+    // const uint pwm_channel;
+  } dshot_packet_t;
 
   /**
    * @brief Convert a DShot code and telemetry flag to a command
@@ -91,39 +110,37 @@ extern "C"
    * @brief Convert Dshot frame to a packet and store in buffer
    *
    * @param frame dshot frame
-   * @param packet_buffer array buffer to store packet.
-   * This must be at least @ref `dshot_frame_size` long
-   * @param conf dshot pwm buffer config
+   * @param packet_buffer array buffer to store \a packet.
+   * This must be at least @ref `dshot_frame_length` long
+   * NOTE: no checks are done for this!
+   * @param packet_high duty cycle for a high bit
+   * @param packet_low duty cycle for a low bit
+   * @param dshot_frame_length length of \a frame to convert. Default is 16
    *
    * @paragraph
    * Potentially, further optimisations can be done to this:
    * https://stackoverflow.com/questions/2249731/how-do-i-get-bit-by-bit-data-from-an-integer-value-in-c
    */
-  static inline void dshot_frame_to_packet(uint16_t frame, uint32_t packet_buffer[], const dshot_packet_config &conf)
+  static inline void dshot_frame_to_packet(uint16_t frame, uint32_t volatile packet_buffer[], const uint32_t packet_high, const uint32_t packet_low, const uint dshot_frame_length = dshot_frame_size)
   {
-    // See pico hardware/pwm.h` for why this shift is needed
-    uint channel_shift = 16 * conf.pwm_channel;
-    for (uint32_t b = 0; b < dshot_frame_size; ++b, frame <<= 1)
+    // Convert each bit in the frame to a high / low duty cycles in the packet
+    for (uint32_t b = 0; b < dshot_frame_length; ++b, frame <<= 1)
     {
-      uint16_t duty_cycle = frame & 0x8000 ? conf.dshot_high : conf.dshot_low;
-      packet_buffer[b] = (uint32_t)duty_cycle << channel_shift;
+      packet_buffer[b] = frame & 0x8000 ? packet_high : packet_low;
     }
   }
 
   /**
-   * @brief Convert dshot code and telemetry to packet
-   *
-   * @param code dshot code
-   * @param telemetry
-   * @param packet_buffer array buffer to store packet.
-   * This must be at least @ref `dshot_frame_size` long
-   * @param conf dshot pwm buffer config
-   */
-  static inline void dshot_cmd_to_packet(const uint16_t code, const uint16_t telemetry, uint32_t packet_buffer[], const dshot_packet_config &conf)
+   * @brief Compose packet from dshot code and telemetry
+   * 
+   * @param dshot_pckt dshot_packet_t config.
+   * The calculated packet is stroed in dshot_pckt.packet_buffer
+  */
+  static inline void dshot_packet_compose(dshot_packet_t &dshot_pckt)
   {
-    uint16_t cmd = dshot_code_telemtry_to_cmd(code, telemetry);
+    uint16_t cmd = dshot_code_telemtry_to_cmd(dshot_pckt.throttle_code, dshot_pckt.telemetry);
     uint16_t frame = dshot_cmd_to_frame(cmd);
-    dshot_frame_to_packet(frame, packet_buffer, conf);
+    dshot_frame_to_packet(frame, dshot_pckt.packet_buffer, dshot_pckt.packet_high, dshot_pckt.packet_low, dshot_frame_size);
   }
 
 #ifdef __cplusplus
