@@ -8,13 +8,14 @@ set(CMAKE_CXX_STANDARD 17)
 pico_sdk_init()
 
 set(DSHOT_FILES 
-  ./lib/shoot/shoot.cpp 
-  ./lib/tts/tts.cpp 
+  # ./lib/shoot/shoot.cpp 
+  # ./lib/tts/tts.cpp 
+  ./src/dshot.c
 )
 
 set(DSHOT_INCL
-  ./lib/shoot
-  ./lib/tts
+  # ./lib/shoot
+  # ./lib/tts
   ./include
 )
 
@@ -26,4 +27,5 @@ target_link_libraries(dshot-pico
   hardware_pwm
   hardware_dma
   hardware_irq
+  hardware_clocks
 )
