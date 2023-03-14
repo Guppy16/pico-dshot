@@ -1,18 +1,22 @@
-#include "stdio.h"
 #include "dshot.h"
+#include "stdio.h"
 
 /**
  * @brief send a dshot packet
  *
- * TODO: description of how this works
+ * @param dshot ptr to dshot config
+ * @param debug bool for printing debug information
+ *
+ * TODO: IF dma is busy, write to a secondary buffer
+ * ```
+ * if (dma_channel_is_busy(dshot->dma_channel))
+ * ```
  */
 void dshot_send_packet(dshot_config *dshot, bool debug) {
   if (debug) {
     printf("Throttle Code: %i\n", dshot->packet.throttle_code);
   }
 
-  // TODO: IF dma is bust, write to a temp buffer
-  // if (dma_channel_is_busy(dshot->dma_channel))
   dma_channel_wait_for_finish_blocking(dshot->dma_channel);
   dshot_packet_compose(&dshot->packet);
   // Re-configure dma and trigger transfer
@@ -23,13 +27,13 @@ void dshot_send_packet(dshot_config *dshot, bool debug) {
       dshot->packet.packet_buffer, dshot_packet_length, true);
 }
 
-/// @section functions to log dshot setup
-
 void print_dshot_config(dshot_config *dshot) {
 
-  printf("--- Dshot config ---\n");
+  printf("\n--- Dshot config ---\n");
 
   // General config
+  printf("mcu freq: %u khz\n",
+         frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_SYS));
   printf("dshot speed %u khz\n", dshot->dshot_speed_khz);
   printf("esc gpio: %u\n", dshot->esc_gpio_pin);
 
@@ -44,12 +48,12 @@ void print_dshot_config(dshot_config *dshot) {
   printf("\npwm config\n");
   printf("slice: %u\t", pwm_gpio_to_slice_num(dshot->esc_gpio_pin));
   printf("channel: %u\t", pwm_gpio_to_channel(dshot->esc_gpio_pin));
-  printf("wrap: TODO\t");
+  printf("wrap: TODO\n");
 
   // dma channel config
   printf("\ndma channel config\n");
   printf("dma channel: %i\t", dshot->dma_channel);
-  printf("transfer count: %i \t", dshot_packet_length);
+  printf("transfer count: %i \n", dshot_packet_length);
 
   // repeating timer setup
   printf("\ndma repeating timer setup: %d\n", dshot->send_packet_rt_state);

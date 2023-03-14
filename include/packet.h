@@ -33,45 +33,40 @@ extern "C"
    * @ingroup dshot_packet
    *
    * @param primary_packet_buffer
-   * ~~@param secondary_packet_buffer This is declared here, but is used in another file~~
    * @param throttle_code dshot throttle code (11 bit)
    * @param telemetry dshot telemetry flag (1 bit)
    * @param packet_high duty cycle for a dshot high bit
    * @param packet_low duty cycle for a dshot low bit
-   * ~~@param pwm_channel pico pwm channel for dshot packet transmission~~
    *
    * @attention
-   * Normally, the packet_high or packet_low would be 16 bits,
-   * because the pico timers are 16 bit.
-   * However, the pico uses 32 bits to store the value of two timers,
-   * each half stores the timer for a different pwm "channel".
-   * Hene the value of packet_high and packet_low should be initialised as follows:
+   * The pwm duty cycles are set by @ref packet_high or @ref packet_low.
+   * These duty cycle set the counter compare value used by the internal timers.
+   * These are 16 bits; however the pico uses 32 bits to store the value of two timers,
+   * where each half stores the timer for a different pwm \a channel.
+   * In @ref dshot.h, @ref packet_high and @ref packet_low are set as follows:
    * ```
    *  packet_high = (uint32_t)(0.75 * pwm_wrap) << (16 * pwm_channel)
-   *  packet_low = (uint32_t)(0.37 * pwm_wrap) << (16 * pwm_channel)
+   *  packet_low  = (uint32_t)(0.37 * pwm_wrap) << (16 * pwm_channel)
    * ```
    * More details about this shift for pwm_channel can be found in pico hardware/pwm
    */
   typedef struct dshot_packet
   {
     uint32_t volatile packet_buffer[dshot_packet_length];
-    // uint32_t volatile packet_buffer[];
-    // uint32_t volatile secondary_packet_buffer[dshot_packet_length] = {0};
     uint16_t throttle_code;
     uint16_t telemetry;
     uint32_t packet_high;
     uint32_t packet_low;
-    // const uint pwm_channel;
   } dshot_packet_t;
 
   /**
-   * @brief Convert a DShot code and telemetry flag to a command
+   * @brief Convert a dshot code and telemetry flag to a command
    *
-   * @param code Dshot code 11 bits: 0 - 2047
+   * @param code dshot code 11 bits: 0 - 2047
    * @param t telemetry flag
    * @return uint16_t DShot command
    */
-  static inline uint16_t dshot_code_telemtry_to_cmd(const uint16_t code, const uint16_t t)
+  static inline uint16_t dshot_code_telemetry_to_cmd(const uint16_t code, const uint16_t t)
   {
     return code << 1 | (t & 0x1);
   }
@@ -84,7 +79,7 @@ extern "C"
    *
    * @attention
    * A Dshot command is 12 bits: 11 bit code + 1 bit telemetry.
-   * See @ref dshot_code_telemetry_to_cmd()
+   * See @ref dshot_code_telemetry_to_cmd
    */
   static inline uint16_t dshot_cmd_crc(const uint16_t cmd)
   {
@@ -140,7 +135,7 @@ extern "C"
    */
   static inline void dshot_packet_compose(dshot_packet_t *dshot_pckt)
   {
-    uint16_t cmd = dshot_code_telemtry_to_cmd(dshot_pckt->throttle_code, dshot_pckt->telemetry);
+    uint16_t cmd = dshot_code_telemetry_to_cmd(dshot_pckt->throttle_code, dshot_pckt->telemetry);
     uint16_t frame = dshot_cmd_to_frame(cmd);
     dshot_frame_to_packet(frame, dshot_pckt->packet_buffer, dshot_pckt->packet_high, dshot_pckt->packet_low);
   }

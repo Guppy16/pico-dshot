@@ -6,7 +6,7 @@
 # https://github.com/datastax/cpp-driver/blob/master/Doxyfile.in
 
 OUTPUT_DIRECTORY      = @CMAKE_CURRENT_BINARY_DIR@/doc_doxygen/
-INPUT                 = @CMAKE_CURRENT_SOURCE_DIR@/../src/ @CMAKE_CURRENT_SOURCE_DIR@/../include/ @CMAKE_CURRENT_SOURCE_DIR@/../lib/tts/ @CMAKE_CURRENT_SOURCE_DIR@/../lib/shoot/ 
+INPUT                 = @CMAKE_CURRENT_SOURCE_DIR@/../src/ @CMAKE_CURRENT_SOURCE_DIR@/../include/
 EXTRACT_ALL           = YES
 EXTRACT_PRIVATE       = NO
 EXTRACT_STATIC        = YES
