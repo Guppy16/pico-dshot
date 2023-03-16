@@ -31,6 +31,7 @@ enum dshot_code {
  *
  * @param dshot_speed_khz
  * @param esc_gpio_pin GPIO pin connected to ESC
+ * @param pwm_conf
  * @param dma_channel
  * @param dma_config pico dma config
  * @param packet dshot packet config
@@ -42,6 +43,7 @@ enum dshot_code {
 typedef struct dshot_config {
   uint dshot_speed_khz;
   uint esc_gpio_pin;
+  pwm_config pwm_conf;
   int dma_channel;
   dma_channel_config dma_config;
 
@@ -85,23 +87,20 @@ static inline bool dshot_repeating_send_packet(repeating_timer_t *rt) {
  *
  * @attention
  * We assume that pwm_wrap is within the limit of uint16_t
- * If this is not the case, then @ref pwm_div would have to compensate for it
+ * TODO: If this is not the case, then @ref pwm_div would have to compensate for it
  */
 static inline void dshot_pwm_configure(dshot_config *const dshot,
                                        const uint16_t pwm_wrap,
                                        const float pwm_div) {
-  printf("pwm wrap: %u\n", pwm_wrap);
-
-  // slice corresponds to one of 8 timers
-  const uint pwm_slice_num = pwm_gpio_to_slice_num(dshot->esc_gpio_pin);
-  // Timers are 16 bits. channel is the upper or lower half of a 32 bit word
-  const uint pwm_channel = pwm_gpio_to_channel(dshot->esc_gpio_pin);
 
   gpio_set_function(dshot->esc_gpio_pin, GPIO_FUNC_PWM);
-  pwm_set_wrap(pwm_slice_num, pwm_wrap);
-  pwm_set_chan_level(pwm_slice_num, pwm_channel, 0); // default 0 duty cycle
-  pwm_set_clkdiv(pwm_slice_num, pwm_div);
-  pwm_set_enabled(pwm_slice_num, true); // enable pwm
+
+  dshot->pwm_conf = pwm_get_default_config();
+  pwm_config_set_wrap(&dshot->pwm_conf, pwm_wrap);
+  pwm_config_set_clkdiv(&dshot->pwm_conf, pwm_div);
+  pwm_init(pwm_gpio_to_slice_num(dshot->esc_gpio_pin), &dshot->pwm_conf, true);
+
+  pwm_set_gpio_level(dshot->esc_gpio_pin, 0); // default 0 duty cycle
 }
 
 /**
@@ -185,7 +184,6 @@ static void dshot_config_init(dshot_config *const dshot,
                               alarm_pool_t *const pool, const float pwm_div) {
 
   // General config
-  printf("setting general dshot config\n");
   dshot->dshot_speed_khz = dshot_speed_khz;
   dshot->esc_gpio_pin = esc_gpio_pin;
 
@@ -200,9 +198,7 @@ static void dshot_config_init(dshot_config *const dshot,
   dshot_rt_configure(dshot, packet_interval, pool);
 }
 
-/**
- * @brief print dshot config
-*/
+// Print dshot config
 void print_dshot_config(dshot_config *dshot);
 
 #ifdef __cplusplus

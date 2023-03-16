@@ -21,6 +21,7 @@ int main()
 {
   stdio_init_all();
 
+  // Sleep for some time to wait for serial uart to setup
   sleep_ms(1500); // ms
 
   alarm_pool_t *pico_alarm_pool = alarm_pool_get_default();
