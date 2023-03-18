@@ -155,29 +155,6 @@ The packet is transmit from left to right (i.e. big endian).
 
 (Please note that most of this nomenclature is taken from the [betaflight wiki](https://betaflight.com/docs/development/Dshot), but some of it may not be standard)
 
-### Interesting Aside
-
-It takes some time to calculate a packet, before sending it to the DMA hw. 
-We pipeline this by using two buffers:
-- a primary buffer stores the current frame being sent by DMA
-- a second buffer to store the next frame
-
-```c
-if (dma_channel_is_busy){
-  secondary_buffer = dshot_cmd_to_packet();
-  dma_channel_wait_for_finish_blocking();
-}else{
-  primary_buffer = dshot_cmd_to_packet();
-}
-```
-
-Initial profiling showed that both buffers are used, 
-however our codebase has changed a lot since then..
-
-Also, note that `dma_channel_wait_for_finish_blocking()` could be "risky" because this is executed as an interrupt service routine, which expects the routine to finish within a certain amount of time. 
-
-Further optimisation can be done by checking if the current dshot code and telem are the same as the next one, in which case there is no need to recalculate the frame. 
-
 ---
 ## Sources
 

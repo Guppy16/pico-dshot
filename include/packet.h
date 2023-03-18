@@ -35,18 +35,18 @@ extern "C"
    * @param primary_packet_buffer
    * @param throttle_code dshot throttle code (11 bit)
    * @param telemetry dshot telemetry flag (1 bit)
-   * @param packet_high duty cycle for a dshot high bit
-   * @param packet_low duty cycle for a dshot low bit
+   * @param pulse_high duty cycle for a dshot high bit
+   * @param pulse_low duty cycle for a dshot low bit
    *
    * @attention
-   * The pwm duty cycles are set by @ref packet_high or @ref packet_low.
+   * The pwm duty cycles are set by @ref pulse_high or @ref pulse_low.
    * These duty cycle set the counter compare value used by the internal timers.
    * These are 16 bits; however the pico uses 32 bits to store the value of two timers,
    * where each half stores the timer for a different pwm \a channel.
-   * In @ref dshot.h, @ref packet_high and @ref packet_low are set as follows:
+   * In @ref dshot.h, @ref pulse_high and @ref pulse_low are set as follows:
    * ```
-   *  packet_high = (uint32_t)(0.75 * pwm_wrap) << (16 * pwm_channel)
-   *  packet_low  = (uint32_t)(0.37 * pwm_wrap) << (16 * pwm_channel)
+   *  pulse_high = (uint32_t)(0.75 * pwm_wrap) << (16 * pwm_channel)
+   *  pulse_low  = (uint32_t)(0.37 * pwm_wrap) << (16 * pwm_channel)
    * ```
    * More details about this shift for pwm_channel can be found in pico hardware/pwm
    */
@@ -55,8 +55,8 @@ extern "C"
     uint32_t volatile packet_buffer[dshot_packet_length];
     uint16_t throttle_code;
     uint16_t telemetry;
-    uint32_t packet_high;
-    uint32_t packet_low;
+    uint32_t pulse_high;
+    uint32_t pulse_low;
   } dshot_packet_t;
 
   /**
@@ -110,20 +110,20 @@ extern "C"
    * @param packet_buffer array buffer to store \a packet.
    * This must be at least @ref `dshot_frame_length` long
    * NOTE: no checks are done for this!
-   * @param packet_high duty cycle for a high bit
-   * @param packet_low duty cycle for a low bit
+   * @param pulse_high duty cycle for a high bit
+   * @param pulse_low duty cycle for a low bit
    * @param dshot_frame_length length of \a frame to convert. Default is 16
    *
    * @paragraph
    * Potentially, further optimisations can be done to this:
    * https://stackoverflow.com/questions/2249731/how-do-i-get-bit-by-bit-data-from-an-integer-value-in-c
    */
-  static inline void dshot_frame_to_packet(uint16_t frame, uint32_t volatile packet_buffer[], const uint32_t packet_high, const uint32_t packet_low)
+  static inline void dshot_frame_to_packet(uint16_t frame, uint32_t volatile packet_buffer[], const uint32_t pulse_high, const uint32_t pulse_low)
   {
     // Convert each bit in the frame to a high / low duty cycles in the packet
     for (uint32_t b = 0; b < dshot_frame_size; ++b, frame <<= 1)
     {
-      packet_buffer[b] = frame & 0x8000 ? packet_high : packet_low;
+      packet_buffer[b] = frame & 0x8000 ? pulse_high : pulse_low;
     }
   }
 
@@ -137,7 +137,7 @@ extern "C"
   {
     uint16_t cmd = dshot_code_telemetry_to_cmd(dshot_pckt->throttle_code, dshot_pckt->telemetry);
     uint16_t frame = dshot_cmd_to_frame(cmd);
-    dshot_frame_to_packet(frame, dshot_pckt->packet_buffer, dshot_pckt->packet_high, dshot_pckt->packet_low);
+    dshot_frame_to_packet(frame, dshot_pckt->packet_buffer, dshot_pckt->pulse_high, dshot_pckt->pulse_low);
   }
 
 #ifdef __cplusplus

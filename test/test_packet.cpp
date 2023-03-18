@@ -28,12 +28,12 @@ void test_dshot_code_telemtry_to_cmd(void)
 
   telemetry = 0;
   expected_cmd = 0x82C;
-  actual_cmd = dshot_code_telemtry_to_cmd(code, telemetry);
+  actual_cmd = dshot_code_telemetry_to_cmd(code, telemetry);
   TEST_ASSERT_EQUAL_MESSAGE(expected_cmd, actual_cmd, "Telemetry: 0");
 
   telemetry = 1;
   expected_cmd = 0x82D;
-  actual_cmd = dshot_code_telemtry_to_cmd(code, telemetry);
+  actual_cmd = dshot_code_telemetry_to_cmd(code, telemetry);
   TEST_ASSERT_EQUAL_MESSAGE(expected_cmd, actual_cmd, "Telemetry: 1");
 }
 
@@ -81,40 +81,40 @@ void test_dshot_frame_to_packet(void)
   const uint32_t dshot_frame_length = 16;
 
   // pwm channel = 0 (i.e. there is no bit shift in packet values)
-  uint32_t packet_high = 75;
-  uint32_t packet_low = 33;
+  uint32_t pulse_high = 75;
+  uint32_t pulse_low = 33;
 
   // frame = 0
   frame = 0b0;
   for (int i = 0; i < 16; ++i)
   {
-    expected_packet[i] = packet_low;
+    expected_packet[i] = pulse_low;
   }
-  dshot_frame_to_packet(frame, packet, packet_high, packet_low, dshot_frame_length);
+  dshot_frame_to_packet(frame, packet, pulse_high, pulse_low, dshot_frame_length);
   TEST_ASSERT_EQUAL_HEX32_ARRAY_MESSAGE(expected_packet, packet, 16, "frame = 0b0, Channel 0");
 
   // frame = 1
   frame = 0b1;
   for (int i = 0; i < 16; ++i)
   {
-    expected_packet[i] = packet_low;
+    expected_packet[i] = pulse_low;
   }
-  expected_packet[16 - 1] = packet_high;
-  dshot_frame_to_packet(frame, packet, packet_high, packet_low, dshot_frame_length);
+  expected_packet[16 - 1] = pulse_high;
+  dshot_frame_to_packet(frame, packet, pulse_high, pulse_low, dshot_frame_length);
   TEST_ASSERT_EQUAL_HEX32_ARRAY_MESSAGE(expected_packet, packet, 16, "frame = 0b1, Channel 0");
 
-  // frame = 1, with bit shifted values for packet_high and packet_low
+  // frame = 1, with bit shifted values for pulse_high and pulse_low
   frame = 0b1;
 
-  packet_high = 75 << 16;
-  packet_low = 33 << 16;
+  pulse_high = 75 << 16;
+  pulse_low = 33 << 16;
 
   for (int i = 0; i < 16; ++i)
   {
-    expected_packet[i] = packet_low;
+    expected_packet[i] = pulse_low;
   }
-  expected_packet[16 - 1] = packet_high;
-  dshot_frame_to_packet(frame, packet, packet_high, packet_low, dshot_frame_length);
+  expected_packet[16 - 1] = pulse_high;
+  dshot_frame_to_packet(frame, packet, pulse_high, pulse_low, dshot_frame_length);
   TEST_ASSERT_EQUAL_HEX32_ARRAY_MESSAGE(expected_packet, packet, 16, "frame = 0b1, channel 1");
 }
 
@@ -128,24 +128,24 @@ void test_dshot_frame_to_packet(void)
  */
 void test_dshot_packet_compose(void)
 {
-  uint32_t packet_high = 75, packet_low = 33;
+  uint32_t pulse_high = 75, pulse_low = 33;
 
   dshot_packet_t dshot_pckt = {
       .throttle_code = 1,
       .telemetry = 1,
-      .packet_high = packet_high,
-      .packet_low = packet_low};
+      .pulse_high = pulse_high,
+      .pulse_low = pulse_low};
 
   // Construct expected packet:
   uint32_t expected_packet[] = {
       // LLLL
-      packet_low, packet_low, packet_low, packet_low,
+      pulse_low, pulse_low, pulse_low, pulse_low,
       // LLLL
-      packet_low, packet_low, packet_low, packet_low,
+      pulse_low, pulse_low, pulse_low, pulse_low,
       // LLHH
-      packet_low, packet_low, packet_high, packet_high,
+      pulse_low, pulse_low, pulse_high, pulse_high,
       // LLHH
-      packet_low, packet_low, packet_high, packet_high,
+      pulse_low, pulse_low, pulse_high, pulse_high,
       // 0000
       0, 0, 0, 0};
 
