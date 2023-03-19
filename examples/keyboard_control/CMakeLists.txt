@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.12)
 
-include(../lib/extern/pico-sdk/pico_sdk_init.cmake)
+include(../../lib/extern/pico-sdk/pico_sdk_init.cmake)
 
 # include(pico_sdk_import.cmake)
 # include(pico_extras_import.cmake)
@@ -24,14 +24,12 @@ add_executable(${PROJECT_NAME}
 )
 
 # dshot-pico api
-add_subdirectory(../ dshot-pico)
+add_subdirectory(../../ dshot-pico)
 
 target_link_libraries(
   ${PROJECT_NAME}
-  pico_bootsel_via_double_reset
   pico_stdlib
   pico_platform
-  hardware_clocks
   dshot-pico
 )
 

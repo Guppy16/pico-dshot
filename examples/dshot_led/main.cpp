@@ -2,18 +2,14 @@
  * @file
  * 
  * This file will run dshot at 8 Hz on the builtin led on the RP2040 Pico.
- * This is useful to get a sense of what commands are being sent.
- * This can be used for extremely basic debugging.
- * More advanced debugging should use a [INSERT]
- * NOTE: you may need to setup dshot so that it can accept float / hz
+ * At this frequency, the pulses are slow enough to see with your eyes:
+ *  A low pulse is a short pulse
+ *  A high pulse is a long pulse
+ * This is useful to get a sense of the packets being sent,
+ * and was primarily used at the beginning to debug bit endianness.
  * 
- * This is because the equivalent dshot speed is 8 Hz
- * Some usefule checks would be for:
- * \a DSHOT_PWM_WRAP = 1 << 16 - 1
- * \a DSHOT_PWM_DIV = 240
- * \a DMA_ALARM_PERIOD = \a packet_interval = 3 000 000
- * The latter is set as follows:
- * 20 bits / 8 Hz = 2.5 s (time between start of frames)
+ * Now, better tools such as unit testing and a logic analyser can be used,
+ * but this file has been kept for fun.
 */
 
 #include <string.h>
@@ -25,6 +21,7 @@
 #define LED_BUILTIN 25
 #define MOTOR_GPIO LED_BUILTIN
 constexpr float dshot_speed = 0.008;           // khz
+// At 8 Hz, the packet interval is: 20 bits / 8 Hz = 2.5 s
 constexpr int64_t packet_interval_us = 3000000; // 3s interval
 
 int main()
@@ -43,6 +40,7 @@ int main()
 
   dshot.packet.throttle_code = 0b00001111000;
   dshot.packet.telemetry = 0;
+  /// NOTE: without this print statement, the compiler optimises out the above code!
   printf("throttle code: %u\n", dshot.packet.throttle_code);
 
   while (1)
