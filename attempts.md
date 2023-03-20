@@ -247,8 +247,8 @@ Further optimisation can be done by checking if the current dshot code and telem
 
 ## Converting pwm period to wrap and div
 
-A dshot bit is transmit using the pwm hw (remember that each bit is represented as a high or low duty cycle in a _pulse_). 
-Note that a pulse duration is equivalent to the period of a pwm cycle; for clarity, we refer to this as the _pulse period_. 
+A dshot bit is transmit using the pwm hw (remember that each bit is represented as a high or low duty cycle in a _pulse_).
+Note that a pulse duration is equivalent to the period of a pwm cycle; for clarity, we refer to this as the _pulse period_.
 Also note that the pulse period is the same for each bit.
 In `dshot.h::dshow_pwm_configure()`, we specify `pwm_period`, which is the number of cycles the mcu clock will do in a pulse period.
 
@@ -334,7 +334,7 @@ From this we can calculate the min and max dshot speeds on the RP2040:
 | wrap            | 10         | $2^{16}-1$ |
 | div             | 1.0        | 255.9375   |
 |                 |
-| **dshot speed** | 12.5 *M*Hz | 7.5 Hz     |
+| **dshot speed** | 12.5 _M_Hz | 7.5 Hz     |
 
 ### Aside 2: Why is our method accurate enough
 
@@ -357,9 +357,22 @@ $$
 
 Reasonable dshot speeds used in betaflight are dshot 150 -> 1200,
 corresponding to `period = 833.3 -> 104.2` (for $f_{mcu} = 125$ MHz).
-Hence $\frac{f}{s} \isin (100,1000)$. 
+Hence $\frac{f}{s} \isin (100,1000)$.
 If we set `wrap = period`, then we truncate to the nearest integer,
 giving $\delta p < 1$.
 So the maximum relative error in dshot speed is $\frac{1}{100} = 1\%$ (!)
 
 Although 1% may seem high, this is an upper bound. The actual error for dshot 1200 is 0.2%. The ESC is robust to this error. Funnily, since all dshot speeds are a multiple of 150, setting the mcu clock to a high multiple of this such as 120 MHz will completely remove this error!
+
+## Initialise Pico USB / UART
+
+To connect to the pico over serial, we had to initialise the `TinyUSB` submodule from within the pico-sdk.
+Likely, this will get merged into main at some point.
+
+Also, it's not clear what `stdio_init_all()` does because it is defined in multiple places.
+The most accurate seems to be in `src/rp2_common/pico_stdio/include/pico/stdio.h`,
+where this function calls `stdio_uart_init()`, `stdio_usb_init()` and `stdio_semihosting_init()`
+depending on whether or not these interfaces exist.
+
+We "worry" about this because telemetry uses a uart connection to the pico.
+Currently, we call `stdio_init_all()` at the beginning, and then call `stdio_uart_init()` to setup the uart telemetry.

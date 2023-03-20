@@ -9,7 +9,7 @@ This repo is being developed to be used as submodule for [pico-tts](https://gith
 
 ## Setting up the repo
 
-```
+```terminal
 git clone git@github.com:Guppy16/pico-dshot.git
 git submodule update --init
 cd lib/extern/pico-sdk
@@ -20,7 +20,7 @@ Note that `TinyUSB` is required to use the uart on the pico for serial read and 
 
 ## Running the Unit Tests
 
-We use [Unity Test](https://github.com/ThrowTheSwitch/Unity) as the framework for our tests. 
+We use [Unity Test](https://github.com/ThrowTheSwitch/Unity) as the framework for our tests.
 Assuming all the submodules have been setup:
 
 ```terminal
@@ -31,71 +31,60 @@ ctest --verbose
 ```
 
 ---
-## Example
 
-An example is included in `example/`:
+## Examples
+
+Examples are provided in `example/`.
+Below shows how the _simple_ example can be compiled (the others can be compiled similarily).
 
 ```terminal
-mkdir example/build && cd $_
+mkdir examples/simple/build && cd $_
 cmake ..
 cmake --build .
 ```
 
-Connecte the ESC signal pin to GPIO 14, and ESC gnd to pico gnd. 
-Upload `dshot_example.uf2` to the pico, and open a serial connection to it. 
-The motor will automatically arm, and you will be able to enter commands.
-View the list of commands in `example/main.cpp`. 
+All the examples assume the ESC signal pin is connected to GPIO 14, and ESC gnd to pico gnd.
+This can be configured in the corresponding `main.cpp` for each example.
+Upload `dshot_example.uf2` to the pico, and open a serial connection to it.
+Depending on your motor spec, it will automatically _arm_ (i.e ready to receive commands; not start spinning).
+The serial monitor can be used to check the ouput is correct.
 
 ---
+
 ## Code Overview
 
-```
-|-- include/
-    |-- config.h
-    |-- packet.h
-|-- lib/
-    |-- tts/
-    |-- shoot/
-|-- example/
-    |-- main.cpp
-|-- test/
-    |-- test_packet.cpp
-```
-
 - `include` header files to setup dshot variables and functions
-    - `config.h` configure dshot globals
-    - `packet.h` convert a dshot command to a packet
-- `lib/` contains the libraries used to implement dshot on the pico   
-    - `tts/` pico hw implementations for dma, pwm, alarm pool
-    - `shoot/` send a dshot packet repeatedly
-- `example/`
-  - `main.cpp` allows you to use serial input to send dshot commands
-- `test/` contains a unit test for `dshot/` as well as a cmake config file
+  - `packet.h` module to compose a dshot packet from a dshot command
+  - `dshot.h` configure pico hw (pwm, dma, rt) for dshot
+- `lib/extern/`
+  - `pico-sdk/` pico sdk submodule
+  - `Unity/` submodule for testing framework
+- `examples/`
+  - `simple/` most basic boilerplate to start sending dshot packets
+  - `keyboard_control/` allows you to use serial input to send dshot commands
+  - `dshot_led/` send dshot packets to builtin led for intuitive vis
+- `test/` unit test `packet.h`
 
 Dependency Graph:
 
-```
-|-- shoot
-|   |-- tts
-|   |   |-- config
+```terminal
+|-- dshot
 |   |-- packet
 ```
 
 ## To Do
-- [ ] This whole repo can be setup as header only: `./dshot/include/globals.h, hw.h`
-- [ ] The print statemtents could be placed in an implementation file: `./dshot/src/logging.cpp`
+
+- [ ] Add telemetry
+- [ ] Attempt proper arm sequence
 
 ## Backlog
-- [ ] attempt proper arm sequence
-- [ ] Try: `DSHOT_SPEED = DEBUG ? 0.008 : 1200 // kHz` (this may get rid of some other ternaries on DEBUG)
-- [ ] Add validation to ensure PWM, DMA, repeating timer have been setup correctly. MCU_CLK could take in a measured reading. Use `lib/extern/pico-sdk/src/rp2_common/hardware_clocks/scripts/vcocalc.py` to find valid sys clock frequencies.
-- [ ] Currently dma writes to a PWM counter compare. This actually writes to two dma channels (because upper / lower 16 bits are separate counters). Hence we render one dma channel useless. Is it possible to implement this in a better way?
-- [ ] Scheme to represent DShot codes. enum is possible for special codes, but shouldn't be used for throttle values? Explore the idea of using / generating a look up table to convert dshot to pwm counter values (and vice versa for bidir dshot). 
-Can this be hooked up with Programmable IO?
-Memory usage: 2^16 command x 32 bit word = 32k x 64 bit word (that might be too much). 
-- [ ] I believe that the uart and serial are initialised in `stdio_init_all()` (called in `main.cpp`). Perhaps we should use `stdio_usb_init()` and `stdio_uart_init()` separately. For telemetry (not yet committed), Peter used `stdio_uart_init()` after `stdio_init_all()` and didn't have errors.
+
+- [ ] Currently dma writes to a PWM slice counter compare. This slice corresponds to two channels, hence dma may overwrite another channel. Is there a way to validate this? Can we use smth similar to `hw_write_masked()` (in `pwm.h`)?
+- [ ] If composing a dshot pckt from cmd ever becomes the bottleneck, an alternative is to use a lookup table: address corresponds to 12 bit command (ignoring CRC), which maps to packets (an array of length 16, where each element is a 16 bit duty cycle). Memory usage: 2^12 address x (16 x 16 packet) = 2^20 bit word = 1 MB. This can be further compressed as the telemetry bit affects only the last two nibbles. Note: Pico flash = 2 MB.
+- [ ] Test dshot performance using 125 MHz and 120 MHz mcu clk. May need to play around with `vco` using `lib/extern/pico-sdk/src/rp2_common/hardware_clocks/scripts/vcocalc.py` to find valid sys clock frequencies.
 
 ---
+
 ## DShot Protocol
 
 DShot is a digital protocol used to send commands from a flight controller to an ESC, in order to control a motor. 
@@ -110,60 +99,65 @@ A Dshot *frame* is constructed as follows:
 | 11 bits | 1 bit       | 4 bit      |
 | 0 - 2047| Boolean     | CRC        |
 
-| Dshot *Value* | Meaning                                |
-| ------------- | -------------------------------------- |
-| 0             | Disarm, but hasn't been implemented    |
-| 1 - 47        | Reserved for special use               |
-| 48 - 2047     | Throttle position (resolution of 2000) |
+| Dshot Value | Meaning                                |
+| ----------- | -------------------------------------- |
+| 0           | Disarm, but hasn't been implemented    |
+| 1 - 47      | Reserved for special use               |
+| 48 - 2047   | Throttle position (resolution of 2000) |
 
-A bit is converted to a *duty cycle*, which is transmit as a "pulse" using PWM hw. 
+Each bit is transmit as a high/low _duty cycle_ in a "__pulse__" using PWM hw:
 
 | bit | duty cycle |
 | --- | ---------- |
 | 0   | \< 33%     |
-| 1   | >75%       |
+| 1   | > 75%       |
 
-The *period* of each pulse (or bit) is set by the Dshot freqeuncy (e.g. Dshot150 corresponds to 150 kHz). 
-
-To indicate a frame reset, a pause of at least $2 \mu$s is required (source [Betaflight wiki](https://betaflight.com/docs/development/Dshot)). This pause should have a duty cycle of 0. 
-This pause can be converted to bits as follows:
+The dshot frequency defines the _pulse period_:
 
 $$
-\text{Pause bits} = \lceil \frac{2 \mu \text{s}}{\text{Pulse Period}} \rceil
+\text{pulse period} = \frac{1}{f_\text{dshot}}
 $$
 
+To indicate a frame reset, a pause of at least 2 μs is required between frames (source [Betaflight wiki](https://betaflight.com/docs/development/Dshot)). This pause can be represented as 0 duty cycles pulses:
 
-| Dshot freq / kHz | pulse period / $\mu$s | Pause bits |
-| ---------------- | --------------------- | ---------- |
-| 150              | 6.67                  | 1          |
-| 600              | 1.67                  | 2          |
-| 1200             | 0.833                 | 3          |
+$$
+\text{Pause pulses (or bits)} = \lceil \frac{2 \mu \text{s}}{\text{Pulse Period}} \rceil
+$$
 
-Our implementation uses a constant value of 4 bits as a pause between frames (i.e. we assume a max Dshot freq of 2000). 
-Hence, the PWM hw is sent a *packet* of 20 duty cycles (16 for a DShot frame and 4 for a frame reset).
+| Dshot freq / kHz | pulse period / μs | Pause bits |
+| ---------------- | ----------------- | ---------- |
+| 150              | 6.67              | 1          |
+| 600              | 1.67              | 2          |
+| 1200             | 0.833             | 3          |
+
+Our implementation uses a constant value of 4 bits as a pause between frames (i.e. we assume a max Dshot freq of 2000).
+Hence, the PWM hw is sent a __packet__ of 20 pulses (16 for a DShot frame and 4 for a frame reset).
+This is set in `packet.h::dshot_packet_length`.
 
 ### Example
 
 To make the motors beep a DShot packet is constructed as follows:
 
-The Dshot *command* is: `Value = 1`, `Telemetry = 1`
+The Dshot __command__ is: `Value = 1`, `Telemetry = 1`
 
-→ First 12 bits of the command `0x003`
+→ First 12 bits of the _frame_: `Frame[0:12] = [Value|Telemetry] = 0x003`
 
-→ `CRC = 0 XOR 0 XOR 3 = 3`
+→ The 4 bit crc is: `CRC = 0 XOR 0 XOR 3 = 3`
 
-→ `Frame = 0x0033`
+→ Concatonate `Frame[0:16] = [Value|Telemetry|CRC] = 0x0033`
 
-→ `Packet = LLLL LLLL LLHH LLHH 0000`
+→ Compose packet (with frame reset pulses at the end): `Packet = LLLL LLLL LLHH LLHH 0000`
 
-The packet is transmit from left to right (i.e. big endian). 
+The packet is transmit from left to right (i.e. big endian).
 
 (Please note that most of this nomenclature is taken from the [betaflight dshot wiki](https://betaflight.com/docs/development/Dshot), but some of it may not be standard)
 
 ---
+
 ## Sources
 
 ### Docs and Sample Implementation
+
 - [Pico SDK API Docs](https://raspberrypi.github.io/pico-sdk-doxygen/modules.html). Some quick links: [dma](https://raspberrypi.github.io/pico-sdk-doxygen/group__hardware__dma)
 - [Documentation on the Pico](https://www.raspberrypi.com/documentation/microcontrollers/?version=E0C9125B0D9B) incl spec, datasheets, [pinout](https://datasheets.raspberrypi.com/pico/Pico-R3-A4-Pinout.pdf), etc.
 - [Pico examples](https://github.com/raspberrypi/pico-examples) from the rpi github incl `dma/`. There's an interesting example on pairing an adc with dma [here](https://github.com/raspberrypi/pico-examples/blob/master/adc/dma_capture/dma_capture.c). Note that when viewing pico examples, they use `#include "pico/stdlib.h"`. This is *not* to be used in the *Arduino* framework! as explained in [this post](https://community.platformio.org/t/include-pico-stdlib-h-causes-errors/22997). 
@@ -174,7 +168,7 @@ The packet is transmit from left to right (i.e. big endian).
 ### Explanations of DShot
 
 - [Betaflight DShot Wiki](https://betaflight.com/docs/development/Dshot)
-- [Spencer's HW Blog](https://www.swallenhardware.io/battlebots/2019/4/20/a-developers-guide-to-dshot-escs) has a quick overview on the DShot protocol, list of the dshot command codes (which shd be sourced somewhere in the [betaflight repo](https://github.com/betaflight/betaflight)), and implmenetation overviews using scp and dma. 
+- [Spencer's HW Blog](https://www.swallenhardware.io/battlebots/2019/4/20/a-developers-guide-to-dshot-escs) has a quick overview on the DShot protocol, list of the dshot command codes (which shd be sourced somewhere in the [betaflight repo](https://github.com/betaflight/betaflight)), and implmenetation overviews using scp and dma.
 - [This post](https://blck.mn/2016/11/dshot-the-new-kid-on-the-block/) has a simple explanation of dshot with a few examples
 - [DShot - the missing handbook](https://brushlesswhoop.com/dshot-and-bidirectional-dshot/) has supported hw, dshot frame example, arming, telemetry, bi-directional dshot
 - [BLHeli dshot special command spec](https://github.com/bitdump/BLHeli/blob/master/BLHeli_32%20ARM/BLHeli_32%20Firmware%20specs/Digital_Cmd_Spec.txt)
@@ -196,6 +190,7 @@ The packet is transmit from left to right (i.e. big endian).
 - A [thread on the rpi forum](https://forums.raspberrypi.com/viewtopic.php?p=2091821#p2091821) about inspecting the contents of the alarm pool for logging 
 
 NOTE: (Although we don't use this functionality), a common implmentation measuring timer uses 32 bit time (note that 64 bit is possible using `timer_hw->timerawl` but more effort..)
+
 - `timer_hw->timerawl` returns a 32 bit number representing the number of microseconds since power on
 - This will overflow at around 72 hrs, so must assume that this longer than the operation timer of the pico
 - This has been the cause of many accidental failures in the past :)
@@ -205,7 +200,7 @@ NOTE: (Although we don't use this functionality), a common implmentation measuri
 - [DShot - the missing handbook](https://brushlesswhoop.com/dshot-and-bidirectional-dshot/) also talks about bi-directional dshot
 - [RPi Pico Forum thread on Evaluating PWM signal](https://forums.raspberrypi.com/viewtopic.php?t=308269). This could be useful for bidirectional dshot
 - [Pico Example to measure duty cycle](https://github.com/raspberrypi/pico-examples/blob/master/pwm/measure_duty_cycle/measure_duty_cycle.c)
-- [Interesting PR on the first implementation of bidir dshot](https://github.com/betaflight/betaflight/pull/7264). This discussion alludes to the *politics* of the protocol
+- [Interesting PR on the first implementation of bidir dshot](https://github.com/betaflight/betaflight/pull/7264). This discussion alludes to the _politics_ of the protocol
 - Note that we need to check the FW version on the ESC to see if it supports bidir (and EDT). [BLHeli Passthrough](https://github.com/BrushlessPower/BlHeli-Passthrough) is implemented as an Arduino Lib for ESP32 and some Arduinos. A good exercise would be to add support for the Pico. [This](https://github.com/betaflight/betaflight/blob/master/src/main/drivers/serial_escserial.c#L943) may be a betaflight implementation of passthrough, but I couldn't understand it. [BLHeli Suite](https://github.com/bitdump/BLHeli) is also needed.
 - Researching this topic, I came across DMA "burst" mode, which apparently helps in transitioning from send to receive. Not sure, but maybe a starting point can be achieved from [this post](http://forum.chibios.org/viewtopic.php?t=5677)
 - [Chained DMA](https://vanhunteradams.com/Pico/DAC/DMA_DAC.html) may be useful to switch from write to read configuration
