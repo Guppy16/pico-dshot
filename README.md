@@ -1,8 +1,11 @@
 # Pico DShot
 
 This repo is being developed to use a RPi Pico to send dshot commands to ESCs.
+
+Normally, a flight controller sends commands to an ESC to control a motor. 
+In this repo, we are using a Rpi Pico as a stand in for the flight controller. 
 This is a work in progress.
-This repo was developed to be used as submodule for [pico-tts](https://github.com/Guppy16/pico-tts), which is a project to measure drone motor KPIs using a pico. 
+This repo is being developed to be used as submodule for [pico-tts](https://github.com/Guppy16/pico-tts), which is a project to measure drone motor KPIs using a pico. 
 
 ## Setting up the repo
 
@@ -95,15 +98,17 @@ Memory usage: 2^16 command x 32 bit word = 32k x 64 bit word (that might be too 
 ---
 ## DShot Protocol
 
-A flight controller (Pico) sends commands to the ESC to control the motor.
-DShot is a digital protocol which typically sends commands using PWM hardware (note that we are *not* sending PWM frames, but are rather piggy backing off of its hardware to send dshot frames!). 
-DShot is has discretised resolution, where as PWM was analogue on FC side (albeit discretised on the ESC due to hw limitations), 
-however the advantages in accuracy, precision, resolution and communication outweigh this.
+DShot is a digital protocol used to send commands from a flight controller to an ESC, in order to control a motor. 
+DShot has discretised resolution, where as PWM is analogue (on the FC side albeit discretised on the ESC due to hw limitations). 
+The digital protocal has advantages in accuracy, precision, resolution and communication.
+Typically, dshot commands are sent over PWM hardware (note that we are *not* controlling the motor using "pulse width modulation", but are rather piggy backing off of the PWM hardware to send dshot frames!). 
 
 A Dshot *frame* is constructed as follows:
-- 11 bit number representing the *value* (0 to 2047)
-- 1 bit *telemetry* flag
-- 4 bit *checksum* (CRC)
+
+| *Value* | *Telemetry* | *Checksum* |
+| ------- | ----------- | ---------- |
+| 11 bits | 1 bit       | 4 bit      |
+| 0 - 2047| Boolean     | CRC        |
 
 | Dshot *Value* | Meaning                                |
 | ------------- | -------------------------------------- |
@@ -153,7 +158,7 @@ The Dshot *command* is: `Value = 1`, `Telemetry = 1`
 
 The packet is transmit from left to right (i.e. big endian). 
 
-(Please note that most of this nomenclature is taken from the [betaflight wiki](https://betaflight.com/docs/development/Dshot), but some of it may not be standard)
+(Please note that most of this nomenclature is taken from the [betaflight dshot wiki](https://betaflight.com/docs/development/Dshot), but some of it may not be standard)
 
 ---
 ## Sources
@@ -162,11 +167,8 @@ The packet is transmit from left to right (i.e. big endian).
 - [Pico SDK API Docs](https://raspberrypi.github.io/pico-sdk-doxygen/modules.html). Some quick links: [dma](https://raspberrypi.github.io/pico-sdk-doxygen/group__hardware__dma)
 - [Documentation on the Pico](https://www.raspberrypi.com/documentation/microcontrollers/?version=E0C9125B0D9B) incl spec, datasheets, [pinout](https://datasheets.raspberrypi.com/pico/Pico-R3-A4-Pinout.pdf), etc.
 - [Pico examples](https://github.com/raspberrypi/pico-examples) from the rpi github incl `dma/`. There's an interesting example on pairing an adc with dma [here](https://github.com/raspberrypi/pico-examples/blob/master/adc/dma_capture/dma_capture.c). Note that when viewing pico examples, they use `#include "pico/stdlib.h"`. This is *not* to be used in the *Arduino* framework! as explained in [this post](https://community.platformio.org/t/include-pico-stdlib-h-causes-errors/22997). 
-
-- [PlatformIO Documentation on Pico](https://docs.platformio.org/en/stable/boards/raspberrypi/pico.html#board-raspberrypi-pico). It only mentions the Arduino framework, but more seem to be avaialable (see other links here). 
 - [Unity Assertion Reference](https://github.com/ThrowTheSwitch/Unity/blob/master/docs/UnityAssertionsReference.md) is a useful guide handbook for unit testing with Unity framework. 
 - [Unit testing on Embedded Target using PlatformIO](https://piolabs.com/blog/insights/unit-testing-part-2.html)
-
 - CMake file for Unity Testing was inspired from [Rainer Poisel](https://www.poisel.info/posts/2019-07-15-cmake-unity-integration/), [Throw The Switch](http://www.throwtheswitch.org/build/cmake) and [Testing with CMake and CTest](https://cmake.org/cmake/help/book/mastering-cmake/chapter/Testing%20With%20CMake%20and%20CTest.html). 
 
 ### Explanations of DShot
@@ -179,20 +181,19 @@ The packet is transmit from left to right (i.e. big endian).
 - [Missing Handbook](https://brushlesswhoop.com/dshot-and-bidirectional-dshot/#special-commands) also has a good explanation of commands
 [Original RC Groups post on dshot](https://www.rcgroups.com/forums/showthread.php?2756129-Dshot-testing-a-new-digital-parallel-ESC-throttle-signal)
 - [SiieeFPV](https://www.youtube.com/watch?v=fNLxHWd0Bvg) has a YT vid explaining DMA implementation on a *Kinetis K66*. This vid was a useful in understanding what was needed for our implementation. 
+- KISS ESC onewire telemetry protocol [pdf](https://www.google.co.uk/url?sa=t&rct=j&q=&esrc=s&source=web&cd=&ved=2ahUKEwic6OitkJ3-AhXJUMAKHaL6DiEQFnoECAoQAQ&url=https%3A%2F%2Fwww.rcgroups.com%2Fforums%2Fshowatt.php%3Fattachmentid%3D8524039%26d%3D1450424877&usg=AOvVaw1FWow1ljvZue1ImISgzlca)
 
 ### Other
 
 - Use [Zadig](https://zadig.akeo.ie/) to install drivers for the RPi boot interface on Windows. This makes the flashing experience a LOT better! This has been mentioned in platform io and github forums (in depth [here](https://community.platformio.org/t/official-platformio-arduino-ide-support-for-the-raspberry-pi-pico-is-now-available/20792/9), briefly [here](https://community.platformio.org/t/raspberry-pi-pico-upload-problem/22809/7), which links to [this](https://github.com/platformio/platform-raspberrypi/issues/2#issuecomment-828586398)).
-
 - [Wiz IO Pico](https://github.com/Wiz-IO/wizio-pico): seems like an alternative to the Arduino framework used in PlatformIO? More details can be found on their [Baremetal wiki](https://github.com/Wiz-IO/wizio-pico/wiki/BAREMETAL)
 - [Rpi Pico Forum post](https://forums.raspberrypi.com/viewtopic.php?t=332483). This person has balls to try and implemenet dshot using assembly!!
-
 - List of [Arduino libraries for the RP2040](https://www.arduinolibraries.info/architectures/rp2040). I've not used any yet, but it might be best to use them as reference instead of importing them?
 - Interesting post on [processing serial without blocking](http://www.gammon.com.au/serial)
-
 - [Upload port required issue](https://github.com/platformio/platform-raspberrypi/issues/2). I don't think this issue will be faced if using Zadig
-
 - [BLHeli 32 Manual](https://github.com/bitdump/BLHeli/blob/master/BLHeli_32%20ARM/BLHeli_32%20manual%20ARM%20Rev32.x.pdf)
+- In the future, this repo may want to use [GitHub hosted runners](https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners) to create [GitHub Packages](https://docs.github.com/en/packages/learn-github-packages/introduction-to-github-packages). This may require some knowledge on setting up [GitHub Actions](https://docs.github.com/en/actions/quickstart#creating-your-first-workflow), as well as the [Workflow syntax](https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions)
+- A [thread on the rpi forum](https://forums.raspberrypi.com/viewtopic.php?p=2091821#p2091821) about inspecting the contents of the alarm pool for logging 
 
 NOTE: (Although we don't use this functionality), a common implmentation measuring timer uses 32 bit time (note that 64 bit is possible using `timer_hw->timerawl` but more effort..)
 - `timer_hw->timerawl` returns a 32 bit number representing the number of microseconds since power on
