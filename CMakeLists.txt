@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.12)
 
-include(lib/extern/pico-sdk/pico_sdk_init.cmake)
+# Use this cmake file to import pico sdk. This makes it easier to use as a submodule
+include(lib/extern/pico_sdk_import.cmake)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
