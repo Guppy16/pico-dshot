@@ -17,4 +17,5 @@ target_link_libraries(dshot-pico
   hardware_dma
   hardware_irq
   hardware_clocks
+  hardware_uart
 )
