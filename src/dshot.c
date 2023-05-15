@@ -1,4 +1,5 @@
 #include "dshot.h"
+#include "onewire.h"
 #include "stdio.h"
 
 /**
@@ -20,6 +21,8 @@ void dshot_send_packet(dshot_config *dshot, bool debug) {
       // Write to pwm counter compare
       &pwm_hw->slice[pwm_gpio_to_slice_num(dshot->esc_gpio_pin)].cc,
       dshot->packet.packet_buffer, dshot_packet_length, true);
+  // Reset telemetry bit (so that the onewire uart isn't overloaded)
+  dshot->packet.telemetry = 0;
 }
 
 void print_dshot_config(dshot_config *dshot) {
@@ -68,5 +71,34 @@ void print_dshot_config(dshot_config *dshot) {
   printf("alarm num: %d\n",
          alarm_pool_hardware_alarm_num(dshot->send_packet_rt.pool));
 
-printf("---\n\n");
+  printf("---\n\n");
+}
+
+void print_onewire_config(telem_uart *onewire) {
+  printf("\n--- Onewire config ---\n");
+
+  // uart, gpio
+  const int UART_IRQ = onewire->uart == uart0 ? UART0_IRQ : UART1_IRQ;
+  printf("uart: %i\n", UART_IRQ);
+  printf("gpio: %u\n", onewire->gpio);
+  printf("baudrate: %u\n", onewire->baudrate);
+
+  // ESCs attached to uart
+  printf("ESCs: %d\t", ESC_COUNT);
+  printf("GPIOs: \t");
+  for (size_t i = 0; i < ESC_COUNT; ++i){
+    printf("%u\t", onewire->escs[i].dshot->esc_gpio_pin);
+  }
+  printf("\n");
+
+  // repeating timer
+  pritnf("Repeating timer to request uart:\n");
+  printf("telemetry request flag set: %d\t", onewire->req_flag);
+  printf("set succesfully: %d\n", onewire->send_req_rt_state);
+  printf("delay: %li\t", onewire->send_req_rt.delay_us);
+  printf("alarm id: %i\t", onewire->send_req_rt.alarm_id);
+  printf("alarm num: %d\n",
+         alarm_pool_hardware_alarm_num(onewire->send_req_rt.pool));
+
+  printf("---\n\n");
 }

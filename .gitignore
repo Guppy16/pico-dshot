@@ -1,6 +1,7 @@
 .pio
 .vscode/
-.archive/
+.idea/
 .playground/
 desktop.ini
 build/
+.cache/
