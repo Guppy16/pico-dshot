@@ -10,7 +10,10 @@
  */
 void dshot_send_packet(dshot_config *dshot, bool debug) {
   if (debug) {
-    printf("Throttle Code: %i\n", dshot->packet.throttle_code);
+    if (dshot->packet.telemetry) {
+      printf("Throttle Code: %i\n", dshot->packet.throttle_code);
+      printf("Set telemetry bit\n");
+    }
   }
 
   dma_channel_wait_for_finish_blocking(dshot->dma_channel);
@@ -86,13 +89,13 @@ void print_onewire_config(telem_uart *onewire) {
   // ESCs attached to uart
   printf("ESCs: %d\t", ESC_COUNT);
   printf("GPIOs: \t");
-  for (size_t i = 0; i < ESC_COUNT; ++i){
+  for (size_t i = 0; i < ESC_COUNT; ++i) {
     printf("%u\t", onewire->escs[i].dshot->esc_gpio_pin);
   }
   printf("\n");
 
   // repeating timer
-  pritnf("Repeating timer to request uart:\n");
+  printf("Repeating timer to request uart:\n");
   printf("telemetry request flag set: %d\t", onewire->req_flag);
   printf("set succesfully: %d\n", onewire->send_req_rt_state);
   printf("delay: %li\t", onewire->send_req_rt.delay_us);
