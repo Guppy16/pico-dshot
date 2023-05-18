@@ -1,3 +1,8 @@
+/** @file dshot.h
+ *  @defgroup dshot dshot
+ *
+ * define constants used to setup dshot on a rpi pico
+ */
 #pragma once
 #include "hardware/clocks.h"
 #include "hardware/dma.h"
@@ -7,12 +12,6 @@
 #include "stdio.h"
 
 #include "packet.h"
-
-/** @file dshot.h
- *  @defgroup dshot dshot
- *
- * define constants used to setup dshot on a rpi pico
- */
 
 #ifdef __cplusplus
 extern "C" {
@@ -94,10 +93,10 @@ static inline void pwm_period_to_div_wrap(const float period, float *const div,
           max_div * max_wrap);
   }
 
-  if (period <= max_wrap){
+  if (period <= max_wrap) {
     *wrap = period;
     *div = 1.0f;
-  }else{
+  } else {
     *wrap = max_wrap;
     *div = period / *wrap;
   }
@@ -161,8 +160,8 @@ static inline void dshot_dma_configure(dshot_config *const dshot) {
  * and @ref dshot_config::pwm_conf configured
  *
  * @attention
- * There are two 16 bit timers stored in a 32 bit word, 
- * corresponding to two separate pwm channels. 
+ * There are two 16 bit timers stored in a 32 bit word,
+ * corresponding to two separate pwm channels.
  * This fn shifts the packet values based on the pwm channel
  */
 static inline void dshot_packet_configure(dshot_config *const dshot) {
@@ -228,7 +227,6 @@ static void dshot_config_init(dshot_config *const dshot,
                               const uint esc_gpio_pin,
                               const long int packet_interval,
                               alarm_pool_t *const pool) {
-
   // General config
   dshot->dshot_speed_khz = dshot_speed_khz;
   dshot->esc_gpio_pin = esc_gpio_pin;

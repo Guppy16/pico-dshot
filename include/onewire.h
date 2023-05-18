@@ -27,8 +27,8 @@ extern "C" {
 #endif
 
 // Buffer size of telemetry is 10 bytes for KISS ESC protocol
-static const size_t ONEWIRE_BUFFER_SIZE = 10;
-static const uint ONEWIRE_BAUDRATE = 115200;
+#define ONEWIRE_BUFFER_SIZE 10
+#define ONEWIRE_BAUDRATE 115200
 
 /**
  * @brief minimum time interval between telemetry request
@@ -39,7 +39,7 @@ static const uint ONEWIRE_BAUDRATE = 115200;
  *                    = 827 us
  * Hence min_telem_interval ~ 1 ms is a safe value
  */
-static const uint ONEWIRE_MIN_INTERVAL_US = 1000;
+static const long int ONEWIRE_MIN_INTERVAL_US = 1000;
 
 /**
  * @brief Struct to represent ESC data
@@ -47,7 +47,7 @@ static const uint ONEWIRE_MIN_INTERVAL_US = 1000;
  */
 typedef struct esc_motor {
   dshot_config *dshot;
-  volatile char buffer[ONEWIRE_BUFFER_SIZE] = {0}; // Buffer to telemetry data
+  volatile char buffer[ONEWIRE_BUFFER_SIZE]; // Buffer to telemetry data
   /// TODO: store the telemetry data here (e.g. voltage, temp, etc)
 } esc_motor;
 
@@ -68,17 +68,17 @@ typedef struct esc_motor {
 typedef struct telem_uart {
   uart_inst_t *uart;
   uint gpio;
-  uint baudrate = ONEWIRE_BAUDRATE;
+  uint baudrate;                 /// Defaults to @ref ONEWIRE_BAUDRATE
   bool req_flag;                 // Only request telemetry if req_flag is true
   repeating_timer_t send_req_rt; // Repeating timer config for periodically
                                  // requesting telemetry
   bool send_req_rt_state;        // Technically this is redundant
-  volatile size_t esc_motor_idx = 0; // Keep track of which esc to request telem
+  volatile size_t esc_motor_idx; // Keep track of which esc to request telem
   volatile esc_motor escs[ESC_COUNT];
 
   // variable to store the result from a telemetry read in an irq
-  volatile size_t buffer_idx = 0;
-  volatile char buffer[ONEWIRE_BUFFER_SIZE] = {0};
+  volatile size_t buffer_idx;
+  volatile char buffer[ONEWIRE_BUFFER_SIZE];
 
   // const uint buffer_size = 10;   // KISS telemetry protocol outputs 10 bytes
 
@@ -102,19 +102,26 @@ telem_uart onewire;
  *
  * NOTE: we assume that the uart is automatically cleared in hw
  */
-void onewire_uart_irq(void) {
+static void onewire_uart_irq(void) {
   // Read uart greedily
   while (uart_is_readable(onewire.uart)) {
     // Check if reached end of buffer
     if (onewire.buffer_idx == ONEWIRE_BUFFER_SIZE) {
       printf("Detected overflow in onewire buffer\n");
     } else {
-      onewire.buffer[onewire.buffer_idx++] = uart_getc(onewire.uart);
+      const char c = uart_getc(onewire.uart);
+      onewire.buffer[onewire.buffer_idx++] = c;
+      // printf("%x\t", c);
     }
     // printf("UART: %x\n", onewire.buffer[onewire.buffer_idx - 1]);
   }
   if (onewire.buffer_idx == ONEWIRE_BUFFER_SIZE) {
-    /// TODO: CRC check and populate the relevant ESC telem data
+    /// TODO: CRC check
+    /// TODO: convert data to temp, rpm, etc
+    /// populate the relevant ESC telem data
+    for (size_t i = 0; i < ONEWIRE_BUFFER_SIZE; ++i) {
+      onewire.escs[onewire.esc_motor_idx].buffer[i] = onewire.buffer[i];
+    }
   }
 }
 
@@ -146,7 +153,8 @@ static inline bool onewire_repeating_req(repeating_timer_t *rt) {
   // No need to reset onewire->buffer, because it will be overwritten anyways
 
   // Configure the next ESC to reqest telemetry over uart
-  telem->escs[telem->esc_motor_idx++].dshot->packet.telemetry = 1;
+  telem->esc_motor_idx = (telem->esc_motor_idx + 1) % ESC_COUNT;
+  telem->escs[telem->esc_motor_idx].dshot->packet.telemetry = 1;
 
   return telem->req_flag;
 }
@@ -158,9 +166,9 @@ static inline bool onewire_repeating_req(repeating_timer_t *rt) {
  * @param pull_up
  */
 static inline void onewire_uart_gpio_setup(telem_uart *const telem,
-                                           bool pull_up = false) {
+                                           bool pull_up) {
   // Initialise uart pico and set baudrate
-  telem->baudrate = uart_init(telem->uart, telem->baudrate);
+  telem->baudrate = uart_init(telem->uart, ONEWIRE_BAUDRATE);
   // Turn off flow control
   uart_set_hw_flow(telem->uart, false, false);
   /// TODO: set data format explicitly
@@ -203,9 +211,8 @@ static void onewire_setup_irq(telem_uart *const telem, irq_handler_t handler) {
 static void telem_uart_init(telem_uart *const telem, uart_inst_t *uart,
                             uint gpio, alarm_pool_t *const pool,
                             long int telem_interval,
-                            dshot_config escs[ESC_COUNT], bool req_flag = true,
-                            bool pull_up = false
-) {
+                            dshot_config *escs[ESC_COUNT], bool req_flag,
+                            bool pull_up) {
   // Initialise uart and gpio
   telem->uart = uart;
   telem->gpio = gpio;
@@ -213,7 +220,15 @@ static void telem_uart_init(telem_uart *const telem, uart_inst_t *uart,
 
   // setup pointers to ESC configs
   for (size_t esc_num = 0; esc_num < ESC_COUNT; ++esc_num) {
-    telem->escs[esc_num].dshot = &escs[esc_num];
+    telem->escs[esc_num].dshot = escs[esc_num];
+    for (size_t i = 0; i < ONEWIRE_BUFFER_SIZE; ++i) {
+      telem->escs[esc_num].buffer[i] = 0;
+    }
+  }
+  telem->esc_motor_idx = 0;
+  telem->buffer_idx = 0;
+  for (size_t i = 0; i < ONEWIRE_BUFFER_SIZE; ++i) {
+    telem->buffer[i] = 0;
   }
 
   // Setup onewire uart IRQ to handle telemetry data
