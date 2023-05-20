@@ -26,7 +26,7 @@ extern "C"
    */
 
   #define dshot_packet_length 20
-  const uint dshot_frame_size = 16;
+  const uint DSHOT_FRAME_SIZE = 16;
 
   /**
    * @brief config used for composing dshot packet
@@ -121,7 +121,7 @@ extern "C"
   static inline void dshot_frame_to_packet(uint16_t frame, uint32_t volatile packet_buffer[], const uint32_t pulse_high, const uint32_t pulse_low)
   {
     // Convert each bit in the frame to a high / low duty cycles in the packet
-    for (uint32_t b = 0; b < dshot_frame_size; ++b, frame <<= 1)
+    for (uint32_t b = 0; b < DSHOT_FRAME_SIZE; ++b, frame <<= 1)
     {
       packet_buffer[b] = frame & 0x8000 ? pulse_high : pulse_low;
     }
