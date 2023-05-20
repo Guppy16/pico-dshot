@@ -12,11 +12,11 @@ static void test_kissesc_get_crc8(void) {
 }
 
 static void test_kissesc_buffer_to_telem(void) {
-  kissesc_telem telem;
-  kissesc_buffer_to_telem(kissesc_buffer, &telem);
-  kissesc_print_telem(&telem);
+  kissesc_telem_t telem_data;
+  kissesc_buffer_to_telem(kissesc_buffer, &telem_data);
+  kissesc_print_telem(&telem_data);
 
-  kissesc_telem expected_telem{.temperature = 28,
+  kissesc_telem_t expected_telem{.temperature = 28,
                                .centi_voltage = 1238,
                                .centi_current = 0,
                                .consumption = 23,
@@ -24,12 +24,12 @@ static void test_kissesc_buffer_to_telem(void) {
                                .crc = 0};
   kissesc_print_telem(&expected_telem);
 
-  TEST_ASSERT_EQUAL(expected_telem.temperature, telem.temperature);
-  TEST_ASSERT_EQUAL(expected_telem.centi_voltage, telem.centi_voltage);
-  TEST_ASSERT_EQUAL(expected_telem.centi_current, telem.centi_current);
-  TEST_ASSERT_EQUAL(expected_telem.consumption, telem.consumption);
-  TEST_ASSERT_EQUAL(expected_telem.erpm, telem.erpm);
-  TEST_ASSERT_EQUAL(expected_telem.crc, telem.crc);
+  TEST_ASSERT_EQUAL(expected_telem.temperature, telem_data.temperature);
+  TEST_ASSERT_EQUAL(expected_telem.centi_voltage, telem_data.centi_voltage);
+  TEST_ASSERT_EQUAL(expected_telem.centi_current, telem_data.centi_current);
+  TEST_ASSERT_EQUAL(expected_telem.consumption, telem_data.consumption);
+  TEST_ASSERT_EQUAL(expected_telem.erpm, telem_data.erpm);
+  TEST_ASSERT_EQUAL(expected_telem.crc, telem_data.crc);
 }
 
 static int runUnityTests_kissesctelem(void) {
