@@ -93,7 +93,7 @@ kissesc_buffer_to_telem(const volatile uint8_t buffer[KISS_ESC_TELEM_BUFFER_SIZE
 
 static void kissesc_print_buffer(const volatile uint8_t buffer[],
                                  const size_t buffer_size) {
-  printf("Buffer:\t");
+  printf("Buffer:\t0x");
   for (size_t i = 0; i < buffer_size; ++i) {
     printf("%.2x", buffer[i]);
   }
@@ -101,13 +101,13 @@ static void kissesc_print_buffer(const volatile uint8_t buffer[],
 }
 
 static void kissesc_print_telem(const volatile kissesc_telem_t *telem_data) {
-  printf("---KISS ESC TELEMTRY---\n");
+  printf("\n---KISS ESC TELEMETRY---\n");
   printf("Temperature:\t%i C\n", telem_data->temperature);
   printf("Voltage:\t%.2f V\n", telem_data->centi_voltage / 100.0f);
   printf("Current:\t%.2f A\n", telem_data->centi_current / 100.0f);
   printf("Consumption:\t%i mAh\n", telem_data->consumption);
-  printf("erpm:\t%i\n", telem_data->erpm);
-  printf("CRC8:\t0x%.2x\n", telem_data->crc);
+  printf("Erpm:\t\t%i\n", telem_data->erpm);
+  printf("CRC8:\t\t0x%.2x\n", telem_data->crc);
 }
 
 #ifdef __cplusplus
