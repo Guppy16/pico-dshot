@@ -1,10 +1,8 @@
 /**
  * @file kissesctelem.h
- * @brief
+ * @brief Functions used to process onewire KISS ESC telemetry data
  *
- * Implementation of functionality used to process KISS ESC telemetry data
- * Sources:
- * KISS esc telemetry datasheet:
+ * Sources: KISS esc telemetry datasheet:
  * https://www.rcgroups.com/forums/showatt.php?attachmentid=8524039&d=1450424877
  *
  * A general explanation on how CRC8 works can be found here:
@@ -35,10 +33,11 @@ typedef struct kissesc_telem {
   uint16_t centi_current; // 1/100th of 1 A
   uint16_t consumption;   // 1 mAh
   uint32_t erpm;
+  uint8_t crc;
 } kissesc_telem;
 
 /**
- * @brief Update running total for CRC
+ * @brief Helper function to update running total for CRC8
  *
  * @param val current set of bytes
  * @param crc_seed previously calculated CRC8 (initial value should be 0)
@@ -46,7 +45,7 @@ typedef struct kissesc_telem {
  *
  * @note Implementation was taken from KISS ESC telemetry datasheet
  * @attention This implementation could be improved by pre-calculating and
- * sotring in a LUT
+ * storing in a LUT
  */
 static inline uint8_t kissesc_update_crc(const uint8_t val,
                                          const uint8_t crc_seed) {
@@ -59,9 +58,9 @@ static inline uint8_t kissesc_update_crc(const uint8_t val,
 }
 
 /**
- * @brief Calculate CRC from a buffer
- * 
- * @param buffer 
+ * @brief Calculate CRC8 from a buffer
+ *
+ * @param buffer
  * @param buffer_size KISS_ESC_TELEM_BUFFER_SIZE
  * @return uint8_t CRC checksum. 0 => checksum was good
  */
@@ -76,9 +75,9 @@ static inline uint8_t kissesc_get_crc8(const uint8_t buffer[],
 
 /**
  * @brief Convert buffer to telemetry data
- * 
- * @param buffer 
- * @param telem 
+ *
+ * @param buffer
+ * @param telem
  */
 static inline void
 kissesc_buffer_to_telem(const uint8_t buffer[KISS_ESC_TELEM_BUFFER_SIZE],
@@ -87,18 +86,28 @@ kissesc_buffer_to_telem(const uint8_t buffer[KISS_ESC_TELEM_BUFFER_SIZE],
   telem->centi_voltage = ((uint16_t)(buffer[1])) << 8 | (uint16_t)(buffer[2]);
   telem->centi_current = ((uint16_t)(buffer[3])) << 8 | (uint16_t)(buffer[4]);
   telem->consumption = ((uint16_t)(buffer[5])) << 8 | (uint16_t)(buffer[6]);
-  telem->erpm =
-      100 * ((uint32_t)(buffer[7])) << 8 |
-      (uint32_t)(buffer[8]); // 32 bit to support multiplication by 100
+  telem->erpm = 100 * ((uint32_t)(buffer[7])) << 8 |
+                (uint32_t)(buffer[8]); // 32 bit so no overflow after x100
+  telem->crc = kissesc_get_crc8(buffer, KISS_ESC_TELEM_BUFFER_SIZE);
 }
 
-static void kissesc_print(kissesc_telem *const telem) {
+static void kissesc_print_buffer(const uint8_t buffer[],
+                                 const size_t buffer_size) {
+  printf("Buffer:\t");
+  for (size_t i = 0; i < buffer_size; ++i) {
+    printf("%.2x", buffer[i]);
+  }
+  printf("\n");
+}
+
+static void kissesc_print_telem(const kissesc_telem *telem) {
   printf("---KISS ESC TELEMTRY---\n");
   printf("Temperature:\t%i C\n", telem->temperature);
   printf("Voltage:\t%.2f V\n", telem->centi_voltage / 100.0f);
   printf("Current:\t%.2f A\n", telem->centi_current / 100.0f);
   printf("Consumption:\t%i mAh\n", telem->consumption);
   printf("erpm:\t%i\n", telem->erpm);
+  printf("CRC8:\t0x%.2x\n", telem->crc);
 }
 
 #ifdef __cplusplus
