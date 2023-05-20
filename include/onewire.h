@@ -5,7 +5,6 @@
  *
  * Container to store results from telemetry receivied over one wire uart
  * telemetry
- * TODO: rename struct to onewire
  */
 
 #pragma once
@@ -55,7 +54,6 @@ typedef struct esc_motor {
  * @ingroup onewire
  * General config:
  * @param gpio NOTE: only one gpio because esc telem is one wire
- * @param req_flag Only request telemetry if req flag is true
  * @param send_req_rt Repeating timer config for preodically requesting
  * telemetry
  * @param buffer_size = 10 KISS telemetry protocol outputs 10 bytes
@@ -67,10 +65,9 @@ typedef struct telem_uart {
   uart_inst_t *uart;
   uint gpio;
   uint baudrate;                 /// Defaults to @ref ONEWIRE_BAUDRATE
-  bool req_flag;                 // Only request telemetry if req_flag is true
   repeating_timer_t send_req_rt; // Repeating timer config for periodically
                                  // requesting telemetry
-  bool send_req_rt_state;        // Technically this is redundant
+  bool send_req_rt_state;        // Keep track of repeating timer state
   volatile size_t esc_motor_idx; // Keep track of which esc to request telem
   volatile esc_motor_t escs[ESC_COUNT];
 
@@ -81,6 +78,25 @@ typedef struct telem_uart {
 
 // Global variable for onewire
 onewire_t onewire;
+
+/**
+ * @brief return if gpio supports uart rx.
+ * This doesn't check if the gpio is already being used
+ *
+ * @param gpio
+ * @return true
+ * @return false
+ */
+static inline bool validate_uart_rx_gpio(const uint gpio) {
+  const size_t valid_gpios = 6;
+  uint uart_rx_gpios[] = {1, 5, 9, 13, 17, 21};
+
+  for (size_t i = 0; i < valid_gpios; ++i) {
+    if (gpio == uart_rx_gpios[i])
+      return true;
+  }
+  return false;
+}
 
 /**
  * @brief IRQ for reading telemetry data over uart
@@ -98,8 +114,10 @@ static void onewire_uart_irq(void) {
   while (uart_is_readable(onewire.uart)) {
     // Check if reached end of buffer
     if (onewire.buffer_idx >= KISS_ESC_TELEM_BUFFER_SIZE) {
+      /// NOTE: This printf may not be printed because its long
+      // hence code should handle this elsewhere
+      // for example, take a look at validate_onewire_repeating_req
       printf("Detected overflow in onewire buffer\n");
-      /// TODO: panic?
     } else {
       const char c = uart_getc(onewire.uart);
       onewire.buffer[onewire.buffer_idx] = (uint8_t)c;
@@ -133,12 +151,23 @@ static inline bool validate_onewire_repeating_req(onewire_t *const telem) {
   for (size_t i = 0; i < ESC_COUNT; ++i) {
     telemetry_bit_set += telem->escs[i].dshot->packet.telemetry;
   }
-  if (telemetry_bit_set)
+  if (telemetry_bit_set) {
+    printf("WARN: Telemetry bit set:\t%i\n", telemetry_bit_set);
     return false;
+  }
 
   // Check if we have recieved all telemetry data
-  if (telem->buffer_idx != KISS_ESC_TELEM_BUFFER_SIZE)
+  if (telem->buffer_idx != KISS_ESC_TELEM_BUFFER_SIZE) {
+    printf("WARN: Telemetry buffer idx:\t%i\t", telem->buffer_idx);
+    printf("Buffer:\t");
+    // Dump contents of buffer up till buffer_idx
+    for (size_t i = 0; i < MIN(telem->buffer_idx, KISS_ESC_TELEM_BUFFER_SIZE);
+         ++i) {
+      printf("%.2x", telem->buffer[i]);
+    }
+    printf("\n");
     return false;
+  }
 
   return true;
 }
@@ -154,17 +183,18 @@ static inline bool validate_onewire_repeating_req(onewire_t *const telem) {
  * each other)
  *
  * @param rt
- * @return `telem->req_flag` (set this to false to stop requesting telemetry)
+ * @return `telem->send_req_rt_state` (set this to false to stop requesting
+ * telemetry)
  */
 static inline bool onewire_repeating_req(repeating_timer_t *rt) {
   onewire_t *telem = (onewire_t *)(rt->user_data);
 
   if (!validate_onewire_repeating_req(telem)) {
-    printf("Onewire validation failed. Stopped requesting telemetry");
+    printf("Onewire validation failed. Stopped requesting telemetry\n");
     for (size_t i = 0; i < ESC_COUNT; ++i) {
       telem->escs[i].dshot->packet.telemetry = 0;
     }
-    telem->req_flag = false;
+    telem->send_req_rt_state = false;
     return false;
   }
 
@@ -179,28 +209,36 @@ static inline bool onewire_repeating_req(repeating_timer_t *rt) {
   telem->esc_motor_idx = (telem->esc_motor_idx + 1) % ESC_COUNT;
   telem->escs[telem->esc_motor_idx].dshot->packet.telemetry = 1;
 
-  return telem->req_flag;
+  return telem->send_req_rt_state;
 }
 
 /**
  * @brief Configure uart and gpio
  *
- * @param telem uart_telem object
+ * @param telem onewire variable
+ * @param uart uart0 or uart1
+ * @param gpio
  * @param pull_up
+ *
+ * Panics if gpio cannot be used for uart rx
  */
-static inline void onewire_uart_gpio_setup(onewire_t *const telem,
-                                           bool pull_up) {
+static inline void onewire_uart_gpio_configure(onewire_t *const telem,
+                                               uart_inst_t *const uart,
+                                               const uint gpio, bool pull_up) {
+  telem->uart = uart;
+  telem->gpio = gpio;
   // Initialise uart pico and set baudrate
   telem->baudrate = uart_init(telem->uart, ONEWIRE_BAUDRATE);
-  // Turn off flow control
+  // Turn off flow control (default)
   uart_set_hw_flow(telem->uart, false, false);
-  /// TODO: set data format explicitly
-  // uart_set_format(telem->uart, 8, 1, UART_PARITY_NONE);
-  /// TODO: check if FIFO affects the speed of interpreting chars
-  // uart_set_fifo_enabled(telem->uart, false);
+  /// Set data format (default)
+  uart_set_format(telem->uart, 8, 1, UART_PARITY_NONE);
+  /// enable fifo (default)
+  uart_set_fifo_enabled(telem->uart, true);
 
   // Set GPIO pin mux for UART RX
-  /// TODO: assert that this pin is meant to be used for UART RX
+  if (!validate_uart_rx_gpio(telem->gpio))
+    panic("onewire gpio cannot be configured for uart rx");
   gpio_set_function(telem->gpio, GPIO_FUNC_UART);
   // Optionally set pull up resistor
   gpio_pull_up(telem->gpio);
@@ -212,12 +250,28 @@ static inline void onewire_uart_gpio_setup(onewire_t *const telem,
  * @param telem
  */
 static void onewire_setup_irq(onewire_t *const telem, irq_handler_t handler) {
+  // Reset buffer idx
+  telem->buffer_idx = 0;
   // Add exclusive interrupt handler on RX (for parsing onewire telemetry)
   const int UART_IRQ = telem->uart == uart0 ? UART0_IRQ : UART1_IRQ;
   irq_set_exclusive_handler(UART_IRQ, handler);
   irq_set_enabled(UART_IRQ, true);
   // Enable uart interrupt on RX
   uart_set_irq_enables(telem->uart, true, false);
+}
+
+/**
+ * @brief Configure repeating timer for onewire to request telemetry
+ *
+ * @param telem onewire_t variable
+ * @param telem_interval delay between repeating timer
+ * @param pool this should be the same alarm pool used to configure dshot
+ */
+static void onewire_rt_configure(onewire_t *const telem,
+                                 long int telem_interval, alarm_pool_t *pool) {
+  telem_interval = MAX(ONEWIRE_MIN_INTERVAL_US * ESC_COUNT, telem_interval);
+  telem->send_req_rt_state = alarm_pool_add_repeating_timer_us(
+      pool, telem_interval, onewire_repeating_req, telem, &telem->send_req_rt);
 }
 
 /**
@@ -229,35 +283,33 @@ static void onewire_setup_irq(onewire_t *const telem, irq_handler_t handler) {
  * regularly
  * @param dshot array of dshot configs. The pointers are stored so that
  * telemetry bit can be set when required
+ *
+ * panics if @ref ESC_COUNT < 1
  */
-static void telem_uart_init(onewire_t *const telem, uart_inst_t *uart,
-                            uint gpio, alarm_pool_t *const pool,
+static void telem_uart_init(onewire_t *const telem, uart_inst_t *const uart,
+                            const uint gpio, alarm_pool_t *const pool,
                             long int telem_interval,
                             dshot_config *escs[ESC_COUNT], bool req_flag,
                             bool pull_up) {
   // Initialise uart and gpio
-  telem->uart = uart;
-  telem->gpio = gpio;
-  onewire_uart_gpio_setup(telem, pull_up);
+  onewire_uart_gpio_configure(telem, uart, gpio, pull_up);
 
   // copy pointers to ESC configs
+  if (ESC_COUNT < 1)
+    panic("Expected more than one ESC");
   for (size_t esc_num = 0; esc_num < ESC_COUNT; ++esc_num) {
     telem->escs[esc_num].dshot = escs[esc_num];
   }
   telem->esc_motor_idx = 0;
-  telem->buffer_idx = KISS_ESC_TELEM_BUFFER_SIZE;
-  for (size_t i = 0; i < KISS_ESC_TELEM_BUFFER_SIZE; ++i) {
-    telem->buffer[i] = 0;
-  }
 
   // Setup onewire uart IRQ to handle telemetry data
   onewire_setup_irq(telem, onewire_uart_irq);
 
   // Setup telemetry repeating timer
-  telem_interval = MAX(ONEWIRE_MIN_INTERVAL_US * ESC_COUNT, telem_interval);
-  telem->req_flag = req_flag;
-  telem->send_req_rt_state = alarm_pool_add_repeating_timer_us(
-      pool, telem_interval, onewire_repeating_req, telem, &telem->send_req_rt);
+  telem->send_req_rt_state = req_flag;
+  if (telem->send_req_rt_state) {
+    onewire_rt_configure(telem, telem_interval, pool);
+  }
 }
 
 /// @brief print uart_telem config
