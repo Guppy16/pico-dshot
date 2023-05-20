@@ -77,7 +77,7 @@ void print_dshot_config(dshot_config *dshot) {
   printf("---\n\n");
 }
 
-void print_onewire_config(telem_uart *onewire) {
+void print_onewire_config(onewire_t *onewire) {
   printf("\n--- Onewire config ---\n");
 
   // uart, gpio

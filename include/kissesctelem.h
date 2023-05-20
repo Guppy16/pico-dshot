@@ -34,7 +34,7 @@ typedef struct kissesc_telem {
   uint16_t consumption;   // 1 mAh
   uint32_t erpm;
   uint8_t crc;
-} kissesc_telem;
+} kissesc_telem_t;
 
 /**
  * @brief Helper function to update running total for CRC8
@@ -64,7 +64,7 @@ static inline uint8_t kissesc_update_crc(const uint8_t val,
  * @param buffer_size KISS_ESC_TELEM_BUFFER_SIZE
  * @return uint8_t CRC checksum. 0 => checksum was good
  */
-static inline uint8_t kissesc_get_crc8(const uint8_t buffer[],
+static inline uint8_t kissesc_get_crc8(const volatile uint8_t buffer[],
                                        uint8_t buffer_size) {
   uint8_t crc = 0;
   for (int i = 0; i < buffer_size; ++i) {
@@ -77,21 +77,21 @@ static inline uint8_t kissesc_get_crc8(const uint8_t buffer[],
  * @brief Convert buffer to telemetry data
  *
  * @param buffer
- * @param telem
+ * @param telem_data
  */
 static inline void
-kissesc_buffer_to_telem(const uint8_t buffer[KISS_ESC_TELEM_BUFFER_SIZE],
-                        kissesc_telem *const telem) {
-  telem->temperature = buffer[0];
-  telem->centi_voltage = ((uint16_t)(buffer[1])) << 8 | (uint16_t)(buffer[2]);
-  telem->centi_current = ((uint16_t)(buffer[3])) << 8 | (uint16_t)(buffer[4]);
-  telem->consumption = ((uint16_t)(buffer[5])) << 8 | (uint16_t)(buffer[6]);
-  telem->erpm = 100 * ((uint32_t)(buffer[7])) << 8 |
+kissesc_buffer_to_telem(const volatile uint8_t buffer[KISS_ESC_TELEM_BUFFER_SIZE],
+                        volatile kissesc_telem_t *const telem_data) {
+  telem_data->temperature = buffer[0];
+  telem_data->centi_voltage = ((uint16_t)(buffer[1])) << 8 | (uint16_t)(buffer[2]);
+  telem_data->centi_current = ((uint16_t)(buffer[3])) << 8 | (uint16_t)(buffer[4]);
+  telem_data->consumption = ((uint16_t)(buffer[5])) << 8 | (uint16_t)(buffer[6]);
+  telem_data->erpm = 100 * ((uint32_t)(buffer[7])) << 8 |
                 (uint32_t)(buffer[8]); // 32 bit so no overflow after x100
-  telem->crc = kissesc_get_crc8(buffer, KISS_ESC_TELEM_BUFFER_SIZE);
+  telem_data->crc = kissesc_get_crc8(buffer, KISS_ESC_TELEM_BUFFER_SIZE);
 }
 
-static void kissesc_print_buffer(const uint8_t buffer[],
+static void kissesc_print_buffer(const volatile uint8_t buffer[],
                                  const size_t buffer_size) {
   printf("Buffer:\t");
   for (size_t i = 0; i < buffer_size; ++i) {
@@ -100,14 +100,14 @@ static void kissesc_print_buffer(const uint8_t buffer[],
   printf("\n");
 }
 
-static void kissesc_print_telem(const kissesc_telem *telem) {
+static void kissesc_print_telem(const volatile kissesc_telem_t *telem_data) {
   printf("---KISS ESC TELEMTRY---\n");
-  printf("Temperature:\t%i C\n", telem->temperature);
-  printf("Voltage:\t%.2f V\n", telem->centi_voltage / 100.0f);
-  printf("Current:\t%.2f A\n", telem->centi_current / 100.0f);
-  printf("Consumption:\t%i mAh\n", telem->consumption);
-  printf("erpm:\t%i\n", telem->erpm);
-  printf("CRC8:\t0x%.2x\n", telem->crc);
+  printf("Temperature:\t%i C\n", telem_data->temperature);
+  printf("Voltage:\t%.2f V\n", telem_data->centi_voltage / 100.0f);
+  printf("Current:\t%.2f A\n", telem_data->centi_current / 100.0f);
+  printf("Consumption:\t%i mAh\n", telem_data->consumption);
+  printf("erpm:\t%i\n", telem_data->erpm);
+  printf("CRC8:\t0x%.2x\n", telem_data->crc);
 }
 
 #ifdef __cplusplus
