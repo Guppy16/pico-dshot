@@ -15,7 +15,8 @@ target_include_directories(Unity PUBLIC ../lib/extern/Unity/src)
 # add_library(Dshot STATIC ../lib/dshot/dshot.cpp)
 # target_include_directories(Dshot PUBLIC ../lib/dshot)
 
-add_executable(test_dshot test_packet.cpp)
+# add_executable(test_dshot test_runner.cpp test_packet.cpp test_kissesctelem.cpp)
+add_executable(test_dshot test_runner.cpp)
 include_directories(../include)
 target_link_libraries(test_dshot Unity)
 
