@@ -2,10 +2,10 @@
 
 This repo is being developed to use a RPi Pico to send dshot commands to ESCs.
 
-Normally, a flight controller sends commands to an ESC to control a motor. 
-In this repo, we are using a Rpi Pico as a stand in for the flight controller. 
+Normally, a flight controller sends commands to an ESC to control a motor.
+In this repo, we are using a Rpi Pico as a stand in for the flight controller.
 This is a work in progress.
-This repo is being developed to be used as submodule for [pico-tts](https://github.com/Guppy16/pico-tts), which is a project to measure drone motor KPIs using a pico. 
+This repo is being developed to be used as submodule for [pico-tts](https://github.com/Guppy16/pico-tts), which is a project to measure drone motor KPIs using a pico.
 
 ## Setting up the repo
 
@@ -34,8 +34,10 @@ ctest --verbose
 
 ## Examples
 
+### Compile
+
 Examples are provided in `example/`.
-Below shows how the _simple_ example can be compiled (the others can be compiled similarily).
+Below shows how the _simple_ example can be compiled (the others can be compiled similarily). 
 
 ```terminal
 mkdir examples/simple/build && cd $_
@@ -43,11 +45,23 @@ cmake ..
 cmake --build .
 ```
 
-All the examples assume the ESC signal pin is connected to GPIO 14, and ESC gnd to pico gnd.
-This can be configured in the corresponding `main.cpp` for each example.
+### Pinout
+
+The gpio pins can be configured in the examples in the corresponding `main.cpp` file. This is what has been assumed:
+
+| pin | gpio | connection             |
+| --- | ---- | ---------------------- |
+|     | 13   | onewire uart telemetry |
+|     | 14   | ESC signal             |
+| 18  |      | gnd                    |
+
+Note that the _GND_ pin can be anything, but 18 is used as it's closest to the ESC signal pin. 
+
+### Upload
+
 Upload `dshot_example.uf2` to the pico, and open a serial connection to it.
 Depending on your motor spec, it will automatically _arm_ (i.e ready to receive commands; not start spinning).
-The serial monitor can be used to check the ouput is correct.
+The serial monitor can be used to check if the ouput is correct.
 
 ---
 
@@ -56,25 +70,30 @@ The serial monitor can be used to check the ouput is correct.
 - `include` header files to setup dshot variables and functions
   - `packet.h` module to compose a dshot packet from a dshot command
   - `dshot.h` configure pico hw (pwm, dma, rt) for dshot
+  - `kissesctelem.h` functions to process onewire telem (crc8, buffer --> data)
+  - `onewire.h` configure pico hw for onewire (uart, rt)
 - `lib/extern/`
   - `pico-sdk/` pico sdk submodule
   - `Unity/` submodule for testing framework
 - `examples/`
   - `simple/` most basic boilerplate to start sending dshot packets
   - `keyboard_control/` allows you to use serial input to send dshot commands
-  - `dshot_led/` send dshot packets to builtin led for intuitive vis
-- `test/` unit test `packet.h`
+  - `dshot_led/` send dshot packets to builtin led to _see_ how the packets are sent
+  - `onewire_telemetry/` setup esc to request telemetry data
+- `test/` unit test `packet.h` and `kissesctelem.h`
 
 Dependency Graph:
 
 ```terminal
-|-- dshot
-|   |-- packet
+|-- onewire
+|   |-- kissesctelem
+|   |-- dshot
+|   |   |-- packet
 ```
 
 ## To Do
 
-- [ ] Add telemetry
+- [ ] Update docs on uart. Add section in readme explaining how onewire uart telem works (i.e. sending in dshot, and how each esc is handled).
 - [ ] Attempt proper arm sequence
 
 ## Backlog
@@ -82,22 +101,23 @@ Dependency Graph:
 - [ ] Currently dma writes to a PWM slice counter compare. This slice corresponds to two channels, hence dma may overwrite another channel. Is there a way to validate this? Can we use smth similar to `hw_write_masked()` (in `pwm.h`)?
 - [ ] If composing a dshot pckt from cmd ever becomes the bottleneck, an alternative is to use a lookup table: address corresponds to 12 bit command (ignoring CRC), which maps to packets (an array of length 16, where each element is a 16 bit duty cycle). Memory usage: 2^12 address x (16 x 16 packet) = 2^20 bit word = 1 MB. This can be further compressed as the telemetry bit affects only the last two nibbles. Note: Pico flash = 2 MB.
 - [ ] Test dshot performance using 125 MHz and 120 MHz mcu clk. May need to play around with `vco` using `lib/extern/pico-sdk/src/rp2_common/hardware_clocks/scripts/vcocalc.py` to find valid sys clock frequencies.
+- [ ] Write unit tests that will work on the Pico. Write normal unit tests similar to [Example 2](https://github.com/ThrowTheSwitch/Unity/tree/b0032caca4402da692548f2ee296d3b1b1251ca0/examples/example_2).
 
 ---
 
 ## DShot Protocol
 
-DShot is a digital protocol used to send commands from a flight controller to an ESC, in order to control a motor. 
-DShot has discretised resolution, where as PWM is analogue (on the FC side albeit discretised on the ESC due to hw limitations). 
+DShot is a digital protocol used to send commands from a flight controller to an ESC, in order to control a motor.
+DShot has discretised resolution, where as PWM is analogue (on the FC side albeit discretised on the ESC due to hw limitations).
 The digital protocal has advantages in accuracy, precision, resolution and communication.
-Typically, dshot commands are sent over PWM hardware (note that we are *not* controlling the motor using "pulse width modulation", but are rather piggy backing off of the PWM hardware to send dshot frames!). 
+Typically, dshot commands are sent over PWM hardware (note that we are _not_ controlling the motor using "pulse width modulation", but are rather piggy backing off of the PWM hardware to send dshot frames!).
 
-A Dshot *frame* is constructed as follows:
+A Dshot _frame_ is constructed as follows:
 
-| *Value* | *Telemetry* | *Checksum* |
-| ------- | ----------- | ---------- |
-| 11 bits | 1 bit       | 4 bit      |
-| 0 - 2047| Boolean     | CRC        |
+| _Value_  | _Telemetry_ | _Checksum_ |
+| -------- | ----------- | ---------- |
+| 11 bits  | 1 bit       | 4 bit      |
+| 0 - 2047 | Boolean     | CRC        |
 
 | Dshot Value | Meaning                                |
 | ----------- | -------------------------------------- |
@@ -110,7 +130,7 @@ Each bit is transmit as a high/low _duty cycle_ in a "__pulse__" using PWM hw:
 | bit | duty cycle |
 | --- | ---------- |
 | 0   | \< 33%     |
-| 1   | > 75%       |
+| 1   | > 75%      |
 
 The dshot frequency defines the _pulse period_:
 
@@ -154,16 +174,50 @@ The packet is transmit from left to right (i.e. big endian).
 
 ---
 
+## Onewire Uart Telemetry
+
+There are two methods to receive telemetry data from an ESC: _onewire_, or _bidirectional-dshot_. This section is about _onewire_. This protocol is described in the [KISS ESC 32-bit series onewire telemetry protocol datasheet](./resources/KISS_telemetry_protocol.pdf). Although this method of receiving telemetry is much slower, it is able to send more information. The process looks like this:
+
+- Request onewire telemetry from the ESC: set `Telemetry = 1`
+- Since dshot is much faster than telemetry: reset `Telemetry = 0` (to prevent the ESC spamming telemtry data)
+- The ESC sends a _transmission_ over uart
+- The pico will received the _transmission_, check its CRC8 and then convert the _transmission_ to _telemetry data_. 
+
+
+### _Transmission_
+
+Each transmission is transferred over UART at:
+
+- 115200 baudrate
+- 3.6 V (Use a 1k resistor pull-up to 2.5 - 5 V to remove noise)
+- 10 bytes:
+
+| Byte(s) | Value           | Resolution |
+| :-----: | --------------- | ---------- |
+|    0    | Temperature     | 1 C        |
+| 1 \| 2  | (centi) Voltage | 10 mV      |
+| 3 \| 4  | (centi) Current | 10 mA      |
+| 5 \| 6  | Consumption     | 1 mAh      |
+| 7 \| 8  | Electrical rpm  | 100 erpm   |
+|    9    | 8-bit CRC       |
+
+To convert erpm to rpm:
+
+$$
+\text{rpm} = \frac{\text{erpm}}{\text{\# Magnet pole} \times 2}
+$$
+---
+
 ## Sources
 
 ### Docs and Sample Implementation
 
 - [Pico SDK API Docs](https://raspberrypi.github.io/pico-sdk-doxygen/modules.html). Some quick links: [dma](https://raspberrypi.github.io/pico-sdk-doxygen/group__hardware__dma)
 - [Documentation on the Pico](https://www.raspberrypi.com/documentation/microcontrollers/?version=E0C9125B0D9B) incl spec, datasheets, [pinout](https://datasheets.raspberrypi.com/pico/Pico-R3-A4-Pinout.pdf), etc.
-- [Pico examples](https://github.com/raspberrypi/pico-examples) from the rpi github incl `dma/`. There's an interesting example on pairing an adc with dma [here](https://github.com/raspberrypi/pico-examples/blob/master/adc/dma_capture/dma_capture.c). Note that when viewing pico examples, they use `#include "pico/stdlib.h"`. This is *not* to be used in the *Arduino* framework! as explained in [this post](https://community.platformio.org/t/include-pico-stdlib-h-causes-errors/22997). 
-- [Unity Assertion Reference](https://github.com/ThrowTheSwitch/Unity/blob/master/docs/UnityAssertionsReference.md) is a useful guide handbook for unit testing with Unity framework. 
+- [Pico examples](https://github.com/raspberrypi/pico-examples) from the rpi github incl `dma/`. There's an interesting example on pairing an adc with dma [here](https://github.com/raspberrypi/pico-examples/blob/master/adc/dma_capture/dma_capture.c). Note that when viewing pico examples, they use `#include "pico/stdlib.h"`. This is _not_ to be used in the _Arduino_ framework! as explained in [this post](https://community.platformio.org/t/include-pico-stdlib-h-causes-errors/22997).
+- [Unity Assertion Reference](https://github.com/ThrowTheSwitch/Unity/blob/master/docs/UnityAssertionsReference.md) is a useful guide handbook for unit testing with Unity framework.
 - [Unit testing on Embedded Target using PlatformIO](https://piolabs.com/blog/insights/unit-testing-part-2.html)
-- CMake file for Unity Testing was inspired from [Rainer Poisel](https://www.poisel.info/posts/2019-07-15-cmake-unity-integration/), [Throw The Switch](http://www.throwtheswitch.org/build/cmake) and [Testing with CMake and CTest](https://cmake.org/cmake/help/book/mastering-cmake/chapter/Testing%20With%20CMake%20and%20CTest.html). 
+- CMake file for Unity Testing was inspired from [Rainer Poisel](https://www.poisel.info/posts/2019-07-15-cmake-unity-integration/), [Throw The Switch](http://www.throwtheswitch.org/build/cmake) and [Testing with CMake and CTest](https://cmake.org/cmake/help/book/mastering-cmake/chapter/Testing%20With%20CMake%20and%20CTest.html).
 
 ### Explanations of DShot
 
@@ -174,7 +228,7 @@ The packet is transmit from left to right (i.e. big endian).
 - [BLHeli dshot special command spec](https://github.com/bitdump/BLHeli/blob/master/BLHeli_32%20ARM/BLHeli_32%20Firmware%20specs/Digital_Cmd_Spec.txt)
 - [Missing Handbook](https://brushlesswhoop.com/dshot-and-bidirectional-dshot/#special-commands) also has a good explanation of commands
 [Original RC Groups post on dshot](https://www.rcgroups.com/forums/showthread.php?2756129-Dshot-testing-a-new-digital-parallel-ESC-throttle-signal)
-- [SiieeFPV](https://www.youtube.com/watch?v=fNLxHWd0Bvg) has a YT vid explaining DMA implementation on a *Kinetis K66*. This vid was a useful in understanding what was needed for our implementation. 
+- [SiieeFPV](https://www.youtube.com/watch?v=fNLxHWd0Bvg) has a YT vid explaining DMA implementation on a _Kinetis K66_. This vid was a useful in understanding what was needed for our implementation.
 - KISS ESC onewire telemetry protocol [pdf](https://www.google.co.uk/url?sa=t&rct=j&q=&esrc=s&source=web&cd=&ved=2ahUKEwic6OitkJ3-AhXJUMAKHaL6DiEQFnoECAoQAQ&url=https%3A%2F%2Fwww.rcgroups.com%2Fforums%2Fshowatt.php%3Fattachmentid%3D8524039%26d%3D1450424877&usg=AOvVaw1FWow1ljvZue1ImISgzlca)
 
 ### Other
@@ -187,7 +241,7 @@ The packet is transmit from left to right (i.e. big endian).
 - [Upload port required issue](https://github.com/platformio/platform-raspberrypi/issues/2). I don't think this issue will be faced if using Zadig
 - [BLHeli 32 Manual](https://github.com/bitdump/BLHeli/blob/master/BLHeli_32%20ARM/BLHeli_32%20manual%20ARM%20Rev32.x.pdf)
 - In the future, this repo may want to use [GitHub hosted runners](https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners) to create [GitHub Packages](https://docs.github.com/en/packages/learn-github-packages/introduction-to-github-packages). This may require some knowledge on setting up [GitHub Actions](https://docs.github.com/en/actions/quickstart#creating-your-first-workflow), as well as the [Workflow syntax](https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions)
-- A [thread on the rpi forum](https://forums.raspberrypi.com/viewtopic.php?p=2091821#p2091821) about inspecting the contents of the alarm pool for logging 
+- A [thread on the rpi forum](https://forums.raspberrypi.com/viewtopic.php?p=2091821#p2091821) about inspecting the contents of the alarm pool for logging
 
 NOTE: (Although we don't use this functionality), a common implmentation measuring timer uses 32 bit time (note that 64 bit is possible using `timer_hw->timerawl` but more effort..)
 
