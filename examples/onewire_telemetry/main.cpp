@@ -1,8 +1,10 @@
 /**
  * @file main.cpp
  *
- * Minimum setup required to send dshot commands to an esc.
- * This will send a constant stream of dshot packets with the command 0.
+ * Example to receive onewire uart telemetry data from an ESC at a constant
+ * rate. This will send a constant stream of dshot packets with the command 0.
+ * Meanwhile, every 1s, the dshot packet will have the telemetry bit set to 1.
+ * This will request telemetry and will be receieved by the uart pin.
  * This may arm your motor, but will not send any throttle commands.
  */
 
@@ -10,15 +12,15 @@
 #include "stdio.h"
 #include <string.h>
 
-// #include "dshot.h"
+#include "dshot.h"
 #include "onewire.h"
 
 constexpr uint esc_gpio = 14;
 constexpr float dshot_speed = 1200.0f;           // khz
 constexpr int64_t packet_interval_us = 1000 / 7; // 7 khz packet frequency
-constexpr uint telem_gpio = 13;
+constexpr uint telem_gpio = 13; // Uart RX gpios are {1, 5, 9, 13, 17, 21}
 constexpr long int telem_delay_us = 1e6; // Repeat telemetry every 1s
-constexpr motor_magnet_poles = 14;       // Used to convert erpm to rpm
+constexpr int motor_magnet_poles = 14;       // Used to convert erpm to rpm
 
 int main() {
   stdio_init_all();
