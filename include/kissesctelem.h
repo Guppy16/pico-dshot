@@ -86,8 +86,8 @@ kissesc_buffer_to_telem(const volatile uint8_t buffer[KISS_ESC_TELEM_BUFFER_SIZE
   telem_data->centi_voltage = ((uint16_t)(buffer[1])) << 8 | (uint16_t)(buffer[2]);
   telem_data->centi_current = ((uint16_t)(buffer[3])) << 8 | (uint16_t)(buffer[4]);
   telem_data->consumption = ((uint16_t)(buffer[5])) << 8 | (uint16_t)(buffer[6]);
-  telem_data->erpm = 100 * ((uint32_t)(buffer[7])) << 8 |
-                (uint32_t)(buffer[8]); // 32 bit so no overflow after x100
+  telem_data->erpm = 100 * (uint32_t)(((uint16_t)(buffer[7])) << 8 |
+                (uint16_t)(buffer[8])); // 32 bit so no overflow after x100
   telem_data->crc = kissesc_get_crc8(buffer, KISS_ESC_TELEM_BUFFER_SIZE);
 }
 
