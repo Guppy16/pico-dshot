@@ -376,3 +376,98 @@ depending on whether or not these interfaces exist.
 
 We "worry" about this because telemetry uses a uart connection to the pico.
 Currently, we call `stdio_init_all()` at the beginning, and then call `stdio_uart_init()` to setup the uart telemetry.
+
+## Uart Telemetry Implementation
+
+There are two supported protocols for telemetry using the BLHeli ESC:
+
+- _onewire_: Telemetry is requested by setting the telemetry flag when sending a dshot cmd
+- _auto_-telemetry: Telemetry is sent in regular intervals. This mode needs to be configured in BLHeli Suite.
+
+Naturally, the better solution is to use auto-telemetry, however I only came upon it recently.
+
+### _Auto_-Telemetry
+
+Some resources:
+
+- [Protocol discussion on Github issue](https://github.com/bitdump/BLHeli/issues/431)
+- [GitHub issue with info on BlHel Suite](https://github.com/bitdump/BLHeli/issues/431)
+
+### _Onewire_-Telemetry
+
+Aim: Setup onewire uart telemetry following the [KISS ESC 32-bit series onewire telemetry protocol datasheet](./resources/KISS_telemetry_protocol.pdf). The process looks something like this:
+
+1. Pico: send dshot packet with `Telemetry = 1`. Reset telemetry immediately.
+2. ESC: receive dshot packet; send a _transmission_ over _onewire_ uart telemetry to Pico.
+3. The pico will received the _transmission_, check its CRC8 and then convert the _transmission_ to _telemetry data_.
+
+Note, however, onewire will not send a telemetry _transmission_ if the dshot frame being sent is a special command frame, because these command frames require `telemetry=1`, which could be ambiguous for the ESC (some dshot command frames send data over UART). The only exception I have tested is `value=0`, where setting the telemetry bit does indeed send back a _transmission_. Currently this has been tested for `value=0, 1, >47`. This leads to two complications:
+
+**TODO:**
+
+- send_dshot will have to know when to reset the telemetry bit. (Either create two different telemetry bits, OR send_dshot checks if the frame is a command_frame)
+- onewire will need to check the dshot frame to see if it's a command frame, before validating/setting the onewire telemetry bit!
+- OR is there a method to send an inbetween frame without disruption?!
+
+
+<!-- Hence, the implementation for `dshot_config` needs to be modified to  -->
+
+This section focuses on what method is used to _reset telemetry immediately_.
+The parameters to consider are: reset using an _interrupt_ or not, and what _bit_ to reset.
+
+The ESC is configured to respond to _every_ telemetry request. This means that if we send 10 dshot packets with `telemetry=1`, then we will receieve 10 _onewire transmissions_. Although this may sound like what we want, these _transmission_ will be significantly delayed. This is because _onewire transmissions_ take 10 times  more time to transmit than a dshot frame. This means that when we request telemetry, we must immediately reset it `telemetry=0`. This is somewhat non-trivial. Consider the case where we have the dshot beep command: `Value=1, Telemetry=1`. In this scenario, we would not want to 
+
+A hardware interrupt gives the closest guarantee to a consistent rate of requeseting telemetry. This is useful for consistency. However, adding an interrupt for uart on top of the pre-existing repeating timer (interrupt) to send a dshot packet could lead to impinging.
+Instead of introducing this extra interrupt, we could modifiy `dshot_send_packet()` to manually implement a timer using a counter, and then set/reset telmetry based on a _counter compare_. This gets around adding an interrupt but at the serious overhead in instructions. This is less desirable, because `dshot_send_packet()` is executed as an ISR, hence should take minimal time. Also this is effort. In fact, instead, the extra interrupt (repeating timer) for onewire uart will not impinge on the dshot so long as it is implemented on the [same alarm pool](https://forums.raspberrypi.com/viewtopic.php?t=328648), because alarms on the same alarm pool have equal priority, which means that they will not interrupt each other!
+
+--> Interrupt as a repeating timer
+
+Next is to question when to use this interrupt, and consequently how to reset the telemetry. The most obvious approach would be to have a repeating timer to send a dshot packet requesting for telemetry:
+
+```cpp
+void onewire_repeating_request(dshot_t &dshot)
+{
+  auto t = dshot.telemetry; // Store current value of telemetry
+  dshot.telemetry = 1;
+  dshot_send_packet();
+  dshot.telemetry = t; // reset telemetry to previous value
+}
+```
+
+However, this runs into these issues:
+
+- `dshot_send_packet()` may have to wait for the current packet to finish sending
+- The dshot packet is sent at an irregular rate, which could impact any experiments where we expect a constant dshot rate
+
+To get around this,  `onewire_repeating_request()` instead just sets the `dshot.onewire_telemetry` flag. Meanwhile, `dshot_send_packet()` is modified like so:
+
+```cpp
+
+
+```
+
+ re-implement `dshot_send_packet()` like so:
+
+
+
+
+This runs into the issue that 
+
+This runs into a few issues, namely: the interrupt may have to wait for the current dshot packet to finish sending, before sending the dshot frame to request telemetry, also the packets may not be distributed evenly in time, which could cause stability issues.
+
+
+
+1. After a dshot packet is sent, _always_ reset `telmetry = 0`. 
+
+2. Create a separate flag for `onewire telemetry` and `dshot telmetry`. Always reset `onewire telemetry`. `telemetry bit = onewire_telemetry | dshot_telemetry`.
+
+3. 
+
+
+
+### Converting _transmission_ to telemetry data
+
+TODO:
+
+- Go into details on how CRC8 works
+- Explain how each transmission corresponds to a specific ESC

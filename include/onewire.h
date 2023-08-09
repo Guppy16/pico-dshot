@@ -112,14 +112,15 @@ static inline bool validate_uart_rx_gpio(const uint gpio) {
 static void onewire_uart_irq(void) {
   // Read uart greedily
   while (uart_is_readable(onewire.uart)) {
+    // Read char from uart
+    const char c = uart_getc(onewire.uart);
     // Check if reached end of buffer
     if (onewire.buffer_idx >= KISS_ESC_TELEM_BUFFER_SIZE) {
       /// NOTE: This printf may not be printed because its long
       // hence code should handle this elsewhere
       // for example, take a look at validate_onewire_repeating_req
-      printf("Detected overflow in onewire buffer\n");
+      printf("Onewire overflow\n");
     } else {
-      const char c = uart_getc(onewire.uart);
       onewire.buffer[onewire.buffer_idx] = (uint8_t)c;
       // printf("%x\t", c);
     }
@@ -130,6 +131,10 @@ static void onewire_uart_irq(void) {
     // Convert buffer to telemetry data and populate the relevant ESC
     kissesc_buffer_to_telem(onewire.buffer,
                             &onewire.escs[onewire.esc_motor_idx].telem_data);
+    // Reset buffer idx
+    onewire.buffer_idx = 0;
+    // Debug: Print onewire buffer:
+    // kissesc_print_buffer(onewire.buffer, KISS_ESC_TELEM_BUFFER_SIZE);
   }
 }
 
@@ -156,7 +161,8 @@ static inline bool validate_onewire_repeating_req(onewire_t *const telem) {
     return false;
   }
 
-  // Check if we have recieved all telemetry data
+  // Check if buffer_idx = buffer size
+  // to verify we have recieved all telemetry data
   if (telem->buffer_idx != KISS_ESC_TELEM_BUFFER_SIZE) {
     printf("WARN: Telemetry buffer idx:\t%i\t", telem->buffer_idx);
     printf("Buffer:\t");
@@ -189,14 +195,15 @@ static inline bool validate_onewire_repeating_req(onewire_t *const telem) {
 static inline bool onewire_repeating_req(repeating_timer_t *rt) {
   onewire_t *telem = (onewire_t *)(rt->user_data);
 
-  if (!validate_onewire_repeating_req(telem)) {
-    printf("Onewire validation failed. Stopped requesting telemetry\n");
-    for (size_t i = 0; i < ESC_COUNT; ++i) {
-      telem->escs[i].dshot->packet.telemetry = 0;
-    }
-    telem->send_req_rt_state = false;
-    return false;
-  }
+  // if (!validate_onewire_repeating_req(telem)) {
+  //   printf("Warn: onewire failed...\n");
+  //   for (size_t i = 0; i < ESC_COUNT; ++i) {
+  //     telem->escs[i].dshot->packet.telemetry = 0;
+  //   }
+  //   telem->send_req_rt_state = false;
+  //   return false;
+  // }
+  // printf("TlmReq\n");
 
   // --- Reset data:
   // Reset telemetry bit if not done so

@@ -49,13 +49,13 @@ cmake --build .
 
 The gpio pins can be configured in the examples in the corresponding `main.cpp` file. This is what has been assumed:
 
-| pin | gpio | connection             |
-| --- | ---- | ---------------------- |
-|     | 13   | onewire uart telemetry |
-|     | 14   | ESC signal             |
-| 18  |      | gnd                    |
+| pin | gpio | Pico Pad | ESC Pin                   |
+| --- | ---- | -------- | ------------------------- |
+|     | 13   | UART RX  | Onewire Uart TX Telemetry |
+|     | 14   | PWM      | Dshot Signal              |
+| 18  |      | GND      | ESC Signal GND            |
 
-Note that the _GND_ pin can be anything, but 18 is used as it's closest to the ESC signal pin. 
+Note that the _GND_ pin can be anything, but Pin 18 is used as it's closest to the ESC signal pin. Also note that you may need to solder a wire on the ESC UART TX pad to connect to the pico. 
 
 ### Upload
 
@@ -93,7 +93,7 @@ Dependency Graph:
 
 ## To Do
 
-- [ ] Update docs on uart. Add section in readme explaining how onewire uart telem works (i.e. sending in dshot, and how each esc is handled).
+- [ ] Update docs on uart. Add section in readme explaining how onewire uart telem works (i.e. sending in dshot, and how each esc is handled). Check [this](https://github.com/Guppy16/pico-tts/tree/telem-cmake).  
 - [ ] Attempt proper arm sequence
 
 ## Backlog
@@ -176,21 +176,24 @@ The packet is transmit from left to right (i.e. big endian).
 
 ## Onewire Uart Telemetry
 
-There are two methods to receive telemetry data from an ESC: _onewire_, or _bidirectional-dshot_. This section is about _onewire_. This protocol is described in the [KISS ESC 32-bit series onewire telemetry protocol datasheet](./resources/KISS_telemetry_protocol.pdf). Although this method of receiving telemetry is much slower, it is able to send more information. The process looks like this:
+There are two overarching protocols that can be used to request telemetry data:
 
-- Request onewire telemetry from the ESC: set `Telemetry = 1`
-- Since dshot is much faster than telemetry: reset `Telemetry = 0` (to prevent the ESC spamming telemtry data)
-- The ESC sends a _transmission_ over uart
-- The pico will received the _transmission_, check its CRC8 and then convert the _transmission_ to _telemetry data_. 
+- uart (_onewire_)
+- dshot (_bidirectional dshot_ / _extended dshot telemetry_)
 
+These protocols are _not_ mutually exclusive. This section is about obtaining telemetry using _onewire_ uart telemetry. Using Dshot600, _Onewire_ sends more data every 800 μs, whereas _bidirectional dshot_ just sends eRPM telemetry but every 80 μs. _Onewire_ is described in the [KISS ESC 32-bit series onewire telemetry protocol datasheet](./resources/KISS_telemetry_protocol.pdf). The process looks like this:
 
-### _Transmission_
+- Pico: send dshot packet with `Telemetry = 1`. Reset telemetry immediately.
+- ESC: receive dshot packet; send a _transmission_ over _onewire_ uart telemetry to Pico.
+- The pico will received the _transmission_, check its CRC8 and then convert the _transmission_ to _telemetry data_.
 
-Each transmission is transferred over UART at:
+### _Onewire Transmission_
 
-- 115200 baudrate
-- 3.6 V (Use a 1k resistor pull-up to 2.5 - 5 V to remove noise)
-- 10 bytes:
+Each _transmission_ is transferred over UART at:
+
+- `115200 baudrate`
+- `3.6 V` (Use a `1k` resistor pull-up to `2.5 - 5 V` to remove noise)
+- `10 bytes`:
 
 | Byte(s) | Value           | Resolution |
 | :-----: | --------------- | ---------- |
