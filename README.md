@@ -16,7 +16,7 @@ cd lib/extern/pico-sdk
 git submodule update --init lib/tinyusb
 ```
 
-Note that `TinyUSB` is required to use the uart on the pico for serial read and write.
+Note in the last line, we intialise `TinyUSB`, because it is required to use the uart on the pico for serial read and write.
 
 ## Running the Unit Tests
 
@@ -37,7 +37,8 @@ ctest --verbose
 ### Compile
 
 Examples are provided in `example/`.
-Below shows how the _simple_ example can be compiled (the others can be compiled similarily). 
+Below shows how the _simple_ example can be compiled (the others can be compiled similarily).
+The _simple_ example can be used to check if the motor and ESC are connected correctly.
 
 ```terminal
 mkdir examples/simple/build && cd $_
@@ -55,13 +56,16 @@ The gpio pins can be configured in the examples in the corresponding `main.cpp` 
 |     | 14   | PWM      | Dshot Signal              |
 | 18  |      | GND      | ESC Signal GND            |
 
-Note that the _GND_ pin can be anything, but Pin 18 is used as it's closest to the ESC signal pin. Also note that you may need to solder a wire on the ESC UART TX pad to connect to the pico. 
+Note that the _GND_ pin can be any ground pint, but Pin 18 is used as it's closest to the ESC signal pin.
+
+Separately, note that you may need to solder a wire on the ESC UART TX pad to connect to the pico. 
 
 ### Upload
 
 Upload `dshot_example.uf2` to the pico, and open a serial connection to it.
 Depending on your motor spec, it will automatically _arm_ (i.e ready to receive commands; not start spinning).
-The serial monitor can be used to check if the ouput is correct.
+The serial monitor will print some configuration options, which can be used to verify that the Pico is behaving.
+Ideally, the motor will beep when connected to a power source.
 
 ---
 
@@ -93,11 +97,11 @@ Dependency Graph:
 
 ## To Do
 
-- [ ] Update docs on uart. Add section in readme explaining how onewire uart telem works (i.e. sending in dshot, and how each esc is handled). Check [this](https://github.com/Guppy16/pico-tts/tree/telem-cmake).  
-- [ ] Attempt proper arm sequence
+- [ ] Replace onewire telem with autotelemetry. Likely, the ESC can be reconfigured using some kind of passthrough. [Protocol discussion on Github issue](https://github.com/bitdump/BLHeli/issues/431). [GitHub issue with info on BlHel Suite](https://github.com/bitdump/BLHeli/issues/431).
 
 ## Backlog
 
+- [ ] Attempt proper arm sequence
 - [ ] Currently dma writes to a PWM slice counter compare. This slice corresponds to two channels, hence dma may overwrite another channel. Is there a way to validate this? Can we use smth similar to `hw_write_masked()` (in `pwm.h`)?
 - [ ] If composing a dshot pckt from cmd ever becomes the bottleneck, an alternative is to use a lookup table: address corresponds to 12 bit command (ignoring CRC), which maps to packets (an array of length 16, where each element is a 16 bit duty cycle). Memory usage: 2^12 address x (16 x 16 packet) = 2^20 bit word = 1 MB. This can be further compressed as the telemetry bit affects only the last two nibbles. Note: Pico flash = 2 MB.
 - [ ] Test dshot performance using 125 MHz and 120 MHz mcu clk. May need to play around with `vco` using `lib/extern/pico-sdk/src/rp2_common/hardware_clocks/scripts/vcocalc.py` to find valid sys clock frequencies.
@@ -178,14 +182,35 @@ The packet is transmit from left to right (i.e. big endian).
 
 There are two overarching protocols that can be used to request telemetry data:
 
-- uart (_onewire_)
+- uart (_onewire_ / _autotelemetry_)
 - dshot (_bidirectional dshot_ / _extended dshot telemetry_)
 
-These protocols are _not_ mutually exclusive. This section is about obtaining telemetry using _onewire_ uart telemetry. Using Dshot600, _Onewire_ sends more data every 800 μs, whereas _bidirectional dshot_ just sends eRPM telemetry but every 80 μs. _Onewire_ is described in the [KISS ESC 32-bit series onewire telemetry protocol datasheet](./resources/KISS_telemetry_protocol.pdf). The process looks like this:
+These protocols are _not_ mutually exclusive. This section is about obtaining telemetry using _onewire_ uart telemetry. _Onewire_ sends a variety of data every 800 μs, whereas _bidirectional dshot_ just sends eRPM telemetry but every 80 μs (Dshot600). _Onewire_ is described in the [KISS ESC 32-bit series onewire telemetry protocol datasheet](./resources/KISS_telemetry_protocol.pdf). The process looks like this:
 
-- Pico: send dshot packet with `Telemetry = 1`. Reset telemetry immediately.
-- ESC: receive dshot packet; send a _transmission_ over _onewire_ uart telemetry to Pico.
-- The pico will received the _transmission_, check its CRC8 and then convert the _transmission_ to _telemetry data_.
+```mermaid
+sequenceDiagram
+  box Pico
+  participant pico_dshot as dshot
+  participant Pico onewire as onewire
+  end
+  box ESC
+  participant ESC dshot as dshot
+  participant ESC onewire as onewire
+  end
+
+  loop Every 1ms
+    Note over pico_dshot: Set Telemetry = 1
+    pico_dshot->>ESC dshot: Send dshot packet
+    Note over pico_dshot: Reset Telemetry = 0
+
+  ESC onewire->>Pico onewire: 10 bytes Uart Telemetry _Transmission_
+  Note over pico_dshot, Pico onewire: Process transmission <br/> into telemetry data
+  end
+```
+
+1. Pico: send dshot packet with `Telemetry = 1`. Reset telemetry immediately.
+2. ESC: receive dshot packet; send a _transmission_ over _onewire_ uart telemetry to Pico.
+3. Pico: receive the _transmission_, check its CRC8 and then convert the _transmission_ to _telemetry data_.
 
 ### _Onewire Transmission_
 
@@ -221,6 +246,7 @@ $$
 - [Unity Assertion Reference](https://github.com/ThrowTheSwitch/Unity/blob/master/docs/UnityAssertionsReference.md) is a useful guide handbook for unit testing with Unity framework.
 - [Unit testing on Embedded Target using PlatformIO](https://piolabs.com/blog/insights/unit-testing-part-2.html)
 - CMake file for Unity Testing was inspired from [Rainer Poisel](https://www.poisel.info/posts/2019-07-15-cmake-unity-integration/), [Throw The Switch](http://www.throwtheswitch.org/build/cmake) and [Testing with CMake and CTest](https://cmake.org/cmake/help/book/mastering-cmake/chapter/Testing%20With%20CMake%20and%20CTest.html).
+- Diagrams using [Mermaid.js](http://mermaid.js.org/)
 
 ### Explanations of DShot
 
