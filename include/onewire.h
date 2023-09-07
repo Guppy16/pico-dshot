@@ -60,6 +60,10 @@ typedef struct esc_motor {
  * Storing uart telemetry output
  * @param buffer_idx Keep track of idx in uart telemetry buffer
  * @param buffer Array to hold telemetry buffer data
+ * @param telem_updated_esc -1 <= telem_updated_esc < ESC_COUNT
+ * default -1. If telemetry is received for an ESC, then the ESC idx
+ * is stored in this variable. This idx should be reset
+ * by a main process (e.g. upon reading the onewire data).
  */
 typedef struct telem_uart {
   uart_inst_t *uart;
@@ -74,6 +78,8 @@ typedef struct telem_uart {
   // variable to store the result from a telemetry read in an irq
   volatile size_t buffer_idx;
   volatile uint8_t buffer[KISS_ESC_TELEM_BUFFER_SIZE];
+  // flag is updated when esc telemetry has been received
+  int telem_updated_esc;
 } onewire_t;
 
 // Global variable for onewire
@@ -105,7 +111,8 @@ static inline bool validate_uart_rx_gpio(const uint gpio) {
  * This routine is called as an interrupt service routine.
  * This routine stores the telemtry data in onewire->buffer.
  * Once the buffer is full, the buffer is parsed to telemtry data
- * and stored in the relevant ESC's telem_data data store
+ * and stored in the relevant ESC's telem_data data store.
+ * Also, onewire->telem_updated_esc is set after translation.
  *
  * NOTE: we assume that the uart is automatically cleared in hw
  */
@@ -131,6 +138,9 @@ static void onewire_uart_irq(void) {
     // Convert buffer to telemetry data and populate the relevant ESC
     kissesc_buffer_to_telem(onewire.buffer,
                             &onewire.escs[onewire.esc_motor_idx].telem_data);
+    // Update parameter to let main process know that telemetry data has been
+    // receieved
+    onewire.telem_updated_esc = onewire.esc_motor_idx;
     // Reset buffer idx
     onewire.buffer_idx = 0;
     // Debug: Print onewire buffer:
@@ -195,6 +205,7 @@ static inline bool validate_onewire_repeating_req(onewire_t *const telem) {
 static inline bool onewire_repeating_req(repeating_timer_t *rt) {
   onewire_t *telem = (onewire_t *)(rt->user_data);
 
+  // Perform some validation checks (didn't get this working properly)
   // if (!validate_onewire_repeating_req(telem)) {
   //   printf("Warn: onewire failed...\n");
   //   for (size_t i = 0; i < ESC_COUNT; ++i) {
@@ -212,7 +223,7 @@ static inline bool onewire_repeating_req(repeating_timer_t *rt) {
   telem->buffer_idx = 0;
   // No need to reset onewire->buffer, because it will be overwritten anyways
 
-  // Configure the next ESC to reqest telemetry over uart
+  // Configure the next ESC to request telemetry over uart
   telem->esc_motor_idx = (telem->esc_motor_idx + 1) % ESC_COUNT;
   telem->escs[telem->esc_motor_idx].dshot->packet.telemetry = 1;
 
@@ -259,6 +270,8 @@ static inline void onewire_uart_gpio_configure(onewire_t *const telem,
 static void onewire_setup_irq(onewire_t *const telem, irq_handler_t handler) {
   // Reset buffer idx
   telem->buffer_idx = 0;
+  // No esc telemetry data has been received, so set update variable to -1
+  telem->telem_updated_esc = -1;
   // Add exclusive interrupt handler on RX (for parsing onewire telemetry)
   const int UART_IRQ = telem->uart == uart0 ? UART0_IRQ : UART1_IRQ;
   irq_set_exclusive_handler(UART_IRQ, handler);
@@ -317,6 +330,36 @@ static void telem_uart_init(onewire_t *const telem, uart_inst_t *const uart,
   if (telem->send_req_rt_state) {
     onewire_rt_configure(telem, telem_interval, pool);
   }
+}
+
+/**
+ * @brief return true if onewire telemtry has been updated
+ *
+ * The way onewire is setup is that a repeating timer is used
+ * to request telemetry. The uart then receieves the telemetry
+ * transmission and decodes this. However, the main loop doesn't
+ * know when the data has been received. Hence, this function can
+ * be used to check if the data has been receieved;
+ * i.e. this checks if onewire telemetry data has been updated
+ *
+ * @param onewire
+ */
+static inline bool is_telem_updated(onewire_t *const telem) {
+  return (telem->telem_updated_esc >= 0);
+}
+
+/**
+ * @brief helper function to reset telem update flag
+ *
+ * This is useful in the main loop code.
+ * (see examples/onewire_telemetry)
+ * After reading telemetry data, the telem_updated_esc flag
+ * should be reset, which is the purpose of this function.
+ *
+ * @param telem
+ */
+static inline void reset_telem_updated(onewire_t *const telem) {
+  telem->telem_updated_esc = -1;
 }
 
 /// @brief print uart_telem config

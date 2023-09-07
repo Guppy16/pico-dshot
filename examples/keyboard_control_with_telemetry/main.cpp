@@ -42,8 +42,8 @@ void flash_led(const int &led_pin, uint repeat = 1) {
   }
 }
 
-bool send_beep_rt_state = false;
-repeating_timer_t send_beep_rt; // Repeating timer config for beeper
+bool send_beep_rt_state = false; // Keep track of state of beeper
+repeating_timer_t send_beep_rt;  // Repeating timer config for beeper
 
 /**
  * @brief repeating isr to send a beep command
@@ -54,17 +54,11 @@ repeating_timer_t send_beep_rt; // Repeating timer config for beeper
 bool repeating_dshot_beep(repeating_timer_t *rt) {
   dshot_config *dshot = (dshot_config *)(rt->user_data);
 
-  // Handle Request telemetry
-  dshot->packet.throttle_code = 0;
-  // dshot->packet.telemetry = 1;
-  // dshot_send_packet(dshot, false);
-
   // Beep command: 1;1
   dshot->packet.throttle_code = 1;
   dshot->packet.telemetry = 1;
   dshot_send_packet(dshot, false);
   dshot->packet.throttle_code = 0;
-
 
   return send_beep_rt_state;
 }
@@ -94,7 +88,7 @@ bool update_signal(const int &key_input, dshot_config &dshot) {
     dshot.packet.telemetry = 0;
     dshot_send_packet(&dshot, false);
 
-    // Create a repeating timer to send a beep dshot frame every 260 ms
+    // Create a repeating timer to send a beep dshot frame every 270 ms
     send_beep_rt_state = !send_beep_rt_state;
     if (send_beep_rt_state) {
       send_beep_rt_state = alarm_pool_add_repeating_timer_ms(
@@ -102,7 +96,7 @@ bool update_signal(const int &key_input, dshot_config &dshot) {
     }
     printf("Beeper rt state:\t%d\n", send_beep_rt_state);
 
-    // Hopefully, this will allow telemetry frames to be sent effectively
+    // Deprecated, because this doesn't allow telelemtry frames to be sent
     // dshot.packet.throttle_code = 1;
     // dshot.packet.telemetry = 1;
     break;
@@ -157,6 +151,9 @@ bool update_signal(const int &key_input, dshot_config &dshot) {
     if (onewire.send_req_rt_state) {
       onewire_rt_configure(&onewire, onewire_delay_us, pico_alarm_pool);
       onewire.buffer_idx = 0;
+      printf("Onewire Telem ON\n");
+    } else {
+      printf("Onewire Telem OFF\n");
     }
     break;
 
@@ -195,13 +192,24 @@ int main() {
   // This may be required due to an intial blip in the uart while the ESC is
   // powering up / first receiving dshot commands
   onewire.buffer_idx = KISS_ESC_TELEM_BUFFER_SIZE;
-  /// TODO: print whenever we receieve new telemetry data
+  // Keep track of which esc to extract telemetry information from
+  // This will always be 0 for ESC_COUNT = 1
+  size_t esc_idx = 0;
 
   int key_input = 0;
   while (1) {
     // Read key input from keyboard
     key_input = getchar_timeout_us(0);
     key_input != PICO_ERROR_TIMEOUT &&update_signal(key_input, dshot);
+
+    // Print telemetry data if it's updated
+    if (is_telem_updated(&onewire) && onewire.send_req_rt_state) {
+      // Reset telemetry update variable
+      reset_telem_updated(&onewire);
+      // Print telemetry data
+      kissesc_print_telem(&onewire.escs[esc_idx].telem_data);
+    }
+
     // sleep_ms(100);
   }
 }
