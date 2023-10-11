@@ -83,7 +83,7 @@ typedef struct telem_uart {
 } onewire_t;
 
 // Global variable for onewire
-onewire_t onewire;
+extern onewire_t onewire;
 
 /**
  * @brief return if gpio supports uart rx.

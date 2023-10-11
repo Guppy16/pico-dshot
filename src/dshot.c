@@ -2,6 +2,9 @@
 #include "onewire.h"
 #include "stdio.h"
 
+// Define onewire
+onewire_t onewire;
+
 /**
  * @brief send a dshot packet
  *
