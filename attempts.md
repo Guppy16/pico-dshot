@@ -364,6 +364,21 @@ So the maximum relative error in dshot speed is $\frac{1}{100} = 1\%$ (!)
 
 Although 1% may seem high, this is an upper bound. The actual error for dshot 1200 is 0.2%. The ESC is robust to this error. Funnily, since all dshot speeds are a multiple of 150, setting the mcu clock to a high multiple of this such as 120 MHz will completely remove this error!
 
+```c
+#include "pico/stdlib.h"
+#include "pico/platform.h"
+
+int main() {
+  // Set MCU clock frequency before configuring dshot
+  set_sys_clock_khz(120e3, false);
+
+  // ... initialise dshot
+
+  // Check MCU freq
+  printf("MCU Freq (kHz): %d\n", frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_SYS));
+}
+```
+
 ## Initialise Pico USB / UART
 
 To connect to the pico over serial, we had to initialise the `TinyUSB` submodule from within the pico-sdk.
