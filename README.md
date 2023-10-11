@@ -235,8 +235,9 @@ Each _transmission_ is transferred over UART at:
 To convert erpm to rpm:
 
 $$
-\text{rpm} = \frac{\text{erpm}}{\text{\# Magnet pole} \times 2}
+\text{rpm} = \frac{\text{erpm}}{\text{\\# Magnet pole} \times 2}
 $$
+
 ---
 
 ## Sources
