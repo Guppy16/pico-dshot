@@ -42,6 +42,8 @@ Examples are provided in `example/`.
 Below shows how the _simple_ example can be compiled (the others can be compiled similarily).
 The _simple_ example can be used to check if the motor and ESC are connected correctly.
 
+> _Note_ that you may need to install the GCC cross compiler as mentioned in the [pico-sdk quick-start guide](https://github.com/raspberrypi/pico-sdk#quick-start-your-own-project).
+
 ```terminal
 mkdir examples/simple/build && cd $_
 cmake ..
